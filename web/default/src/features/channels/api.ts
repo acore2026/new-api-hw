@@ -87,6 +87,52 @@ export type CodexCredentialRefreshResponse = {
   }
 }
 
+export type W3OAuthSettingsPayload = {
+  proxy?: string
+  w3_provider_id?: string
+  w3_verify_tls?: boolean
+  w3_api_base_url?: string
+  w3_auth_url?: string
+  w3_token_url?: string
+  w3_refresh_url?: string
+  w3_client_id?: string
+  w3_callback_url_base?: string
+  w3_scope?: string
+}
+
+export type W3OAuthStartResponse = {
+  success: boolean
+  message?: string
+  data?: {
+    authorize_url?: string
+    client_code?: string
+  }
+}
+
+export type W3OAuthCompleteResponse = {
+  success: boolean
+  message?: string
+  data?: {
+    key?: string
+    expires_at?: string
+    last_refresh?: string
+    channel_id?: number
+    pending?: boolean
+  }
+}
+
+export type W3CredentialRefreshResponse = {
+  success: boolean
+  message?: string
+  data?: {
+    expires_at?: string
+    last_refresh?: string
+    channel_id?: number
+    channel_type?: number
+    channel_name?: string
+  }
+}
+
 // ============================================================================
 // Base Channel CRUD Operations
 // ============================================================================
@@ -324,6 +370,41 @@ export async function getCodexUsage(
     `/api/channel/${channelId}/codex/usage`,
     channelActionConfig({ disableDuplicate: true })
   )
+  return res.data
+}
+
+// ============================================================================
+// MiniMax W3 OAuth Operations
+// ============================================================================
+
+export async function startW3OAuth(
+  settings?: W3OAuthSettingsPayload,
+  channelId?: number
+): Promise<W3OAuthStartResponse> {
+  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const url = channelId
+    ? `/api/channel/${channelId}/w3/oauth/start`
+    : '/api/channel/w3/oauth/start'
+  const res = await api.post(url, settings || {}, config)
+  return res.data
+}
+
+export async function completeW3OAuth(
+  channelId?: number
+): Promise<W3OAuthCompleteResponse> {
+  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const url = channelId
+    ? `/api/channel/${channelId}/w3/oauth/complete`
+    : '/api/channel/w3/oauth/complete'
+  const res = await api.post(url, {}, config)
+  return res.data
+}
+
+export async function refreshW3Credential(
+  channelId: number
+): Promise<W3CredentialRefreshResponse> {
+  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const res = await api.post(`/api/channel/${channelId}/w3/refresh`, {}, config)
   return res.data
 }
 

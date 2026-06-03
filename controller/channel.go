@@ -510,6 +510,23 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 		}
 	}
 
+	// MiniMax W3 OAuth key validation (only when the MiniMax channel enables W3 mode).
+	if channel.Type == constant.ChannelTypeMiniMax && channel.GetOtherSettings().W3OAuthEnabled {
+		trimmedKey := strings.TrimSpace(channel.Key)
+		if isAdd || trimmedKey != "" {
+			if !strings.HasPrefix(trimmedKey, "{") {
+				return fmt.Errorf("W3 key must be a valid JSON object")
+			}
+			oauthKey, err := service.ParseW3OAuthKey(trimmedKey)
+			if err != nil {
+				return fmt.Errorf("W3 key must be a valid JSON object: %s", err.Error())
+			}
+			if strings.TrimSpace(oauthKey.RefreshToken) == "" {
+				return fmt.Errorf("W3 key JSON must include refresh_token")
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -27,6 +27,16 @@ type ChannelOtherSettings struct {
 	AzureResponsesVersion                 string        `json:"azure_responses_version,omitempty"`
 	VertexKeyType                         VertexKeyType `json:"vertex_key_type,omitempty"` // "json" or "api_key"
 	OpenRouterEnterprise                  *bool         `json:"openrouter_enterprise,omitempty"`
+	W3OAuthEnabled                        bool          `json:"w3_oauth_enabled,omitempty"`
+	W3ProviderID                          string        `json:"w3_provider_id,omitempty"`
+	W3VerifyTLS                           bool          `json:"w3_verify_tls,omitempty"`
+	W3ApiBaseURL                          string        `json:"w3_api_base_url,omitempty"`
+	W3AuthURL                             string        `json:"w3_auth_url,omitempty"`
+	W3TokenURL                            string        `json:"w3_token_url,omitempty"`
+	W3RefreshURL                          string        `json:"w3_refresh_url,omitempty"`
+	W3ClientID                            string        `json:"w3_client_id,omitempty"`
+	W3CallbackURLBase                     string        `json:"w3_callback_url_base,omitempty"`
+	W3Scope                               string        `json:"w3_scope,omitempty"`
 	ClaudeBetaQuery                       bool          `json:"claude_beta_query,omitempty"`         // Claude 渠道是否强制追加 ?beta=true
 	AllowServiceTier                      bool          `json:"allow_service_tier,omitempty"`        // 是否允许 service_tier 透传（默认过滤以避免额外计费）
 	AllowInferenceGeo                     bool          `json:"allow_inference_geo,omitempty"`       // 是否允许 inference_geo 透传（仅 Claude，默认过滤以满足数据驻留合规

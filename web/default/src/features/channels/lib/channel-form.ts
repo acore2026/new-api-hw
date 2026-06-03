@@ -17,249 +17,87 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
-import {
-  CHANNEL_STATUS,
-  ERROR_MESSAGES,
-  MODEL_FETCHABLE_TYPES,
-} from '../constants'
+import { CHANNEL_STATUS, MODEL_FETCHABLE_TYPES } from '../constants'
 import type { Channel } from '../types'
+
+export const W3_DEFAULTS = {
+  apiBaseUrl: 'https://codeagentcli.rnd.huawei.com/codeAgentPro',
+  authUrl:
+    'https://ssoproxysvr.cd-cloud-ssoproxysvr.szv.dragon.tools.huawei.com/ssoproxysvr/oauth2/authorize',
+  clientId: 'com.huawei.devmind.codebot.apibot',
+  scope: '1000:1002',
+  providerId: 'hw-minimax',
+}
 
 // ============================================================================
 // Form Validation Schema
 // ============================================================================
 
-function parseOptionalJson(value: string | undefined): unknown {
-  if (!value?.trim()) return undefined
-  return JSON.parse(value)
-}
-
-function isJsonObjectValue(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isOptionalJsonObject(value: string | undefined): boolean {
-  try {
-    const parsed = parseOptionalJson(value)
-    return parsed === undefined || isJsonObjectValue(parsed)
-  } catch {
-    return false
-  }
-}
-
-function isOptionalModelMapping(value: string | undefined): boolean {
-  try {
-    const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    if (!isJsonObjectValue(parsed)) return false
-    return Object.values(parsed).every((item) => typeof item === 'string')
-  } catch {
-    return false
-  }
-}
-
-function isOptionalStatusCodeMapping(value: string | undefined): boolean {
-  try {
-    const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    if (!isJsonObjectValue(parsed)) return false
-    return Object.entries(parsed).every(([from, to]) => {
-      const fromCode = Number(from)
-      const toCode = Number(to)
-      return (
-        Number.isInteger(fromCode) &&
-        Number.isInteger(toCode) &&
-        fromCode >= 100 &&
-        fromCode <= 599 &&
-        toCode >= 100 &&
-        toCode <= 599
-      )
-    })
-  } catch {
-    return false
-  }
-}
-
-function isCodexCredential(value: string | undefined): boolean {
-  try {
-    const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    return (
-      isJsonObjectValue(parsed) &&
-      typeof parsed.access_token === 'string' &&
-      parsed.access_token.trim().length > 0 &&
-      typeof parsed.account_id === 'string' &&
-      parsed.account_id.trim().length > 0
-    )
-  } catch {
-    return false
-  }
-}
-
-function isVertexJsonKey(value: string | undefined): boolean {
-  try {
-    const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    if (Array.isArray(parsed)) {
-      return parsed.every((item) => isJsonObjectValue(item))
-    }
-    return isJsonObjectValue(parsed)
-  } catch {
-    return false
-  }
-}
-
-function addRequiredIssue(
-  ctx: z.RefinementCtx,
-  path: string,
-  message: string
-): void {
-  ctx.addIssue({
-    code: z.ZodIssueCode.custom,
-    path: [path],
-    message,
-  })
-}
-
-export const channelFormSchema = z
-  .object({
-    name: z.string().min(1, ERROR_MESSAGES.REQUIRED_NAME),
-    type: z.number().min(0, ERROR_MESSAGES.REQUIRED_TYPE),
-    base_url: z.string().optional(),
-    key: z.string(),
-    openai_organization: z.string().optional(),
-    models: z.string().min(1, ERROR_MESSAGES.REQUIRED_MODELS),
-    group: z.array(z.string()).min(1, ERROR_MESSAGES.REQUIRED_GROUP),
-    model_mapping: z
-      .string()
-      .optional()
-      .refine(
-        isOptionalModelMapping,
-        'Model mapping must be a JSON object with string values'
-      ),
-    priority: z.number().optional(),
-    weight: z.number().optional(),
-    test_model: z.string().optional(),
-    auto_ban: z.number().optional(),
-    status: z.number(),
-    status_code_mapping: z
-      .string()
-      .optional()
-      .refine(
-        isOptionalStatusCodeMapping,
-        'Status code mapping must use valid HTTP status codes'
-      ),
-    tag: z.string().optional(),
-    remark: z
-      .string()
-      .max(255, 'Remark must be less than 255 characters')
-      .optional(),
-    setting: z
-      .string()
-      .optional()
-      .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
-    param_override: z
-      .string()
-      .optional()
-      .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
-    header_override: z
-      .string()
-      .optional()
-      .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
-    settings: z
-      .string()
-      .optional()
-      .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
-    other: z.string().optional(),
-    // Multi-key options (not sent to backend directly)
-    multi_key_mode: z.enum(['single', 'batch', 'multi_to_single']).optional(),
-    multi_key_type: z.enum(['random', 'polling']).optional(),
-    batch_add_set_key_prefix_2_name: z.boolean().optional(),
-    key_mode: z.enum(['append', 'replace']).optional(), // For editing multi-key channels
-    // Channel extra settings (stored in setting JSON, not sent directly)
-    force_format: z.boolean().optional(),
-    thinking_to_content: z.boolean().optional(),
-    proxy: z.string().optional(),
-    pass_through_body_enabled: z.boolean().optional(),
-    system_prompt: z.string().optional(),
-    system_prompt_override: z.boolean().optional(),
-    // Type-specific settings (stored in settings JSON)
-    is_enterprise_account: z.boolean().optional(), // OpenRouter specific
-    vertex_key_type: z.enum(['json', 'api_key']).optional(), // Vertex AI specific
-    aws_key_type: z.enum(['ak_sk', 'api_key']).optional(), // AWS specific
-    azure_responses_version: z.string().optional(), // Azure specific
-    // Field passthrough controls (stored in settings JSON)
-    allow_service_tier: z.boolean().optional(), // OpenAI/Anthropic
-    disable_store: z.boolean().optional(), // OpenAI only
-    allow_safety_identifier: z.boolean().optional(), // OpenAI only
-    allow_include_obfuscation: z.boolean().optional(), // OpenAI: include usage obfuscation
-    allow_inference_geo: z.boolean().optional(), // OpenAI/Anthropic: inference geography
-    allow_speed: z.boolean().optional(), // Anthropic: speed mode control
-    claude_beta_query: z.boolean().optional(), // Anthropic: beta query passthrough
-    // Upstream model update settings (stored in settings JSON)
-    upstream_model_update_check_enabled: z.boolean().optional(),
-    upstream_model_update_auto_sync_enabled: z.boolean().optional(),
-    upstream_model_update_ignored_models: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if ([3, 8, 36, 45].includes(data.type) && !data.base_url?.trim()) {
-      addRequiredIssue(
-        ctx,
-        'base_url',
-        'Base URL is required for this channel type'
-      )
-    }
-
-    if ([3, 18, 21, 39, 41, 49].includes(data.type) && !data.other?.trim()) {
-      addRequiredIssue(
-        ctx,
-        'other',
-        'This channel type requires additional configuration'
-      )
-    }
-
-    if (data.type === 57) {
-      if (data.multi_key_mode && data.multi_key_mode !== 'single') {
-        addRequiredIssue(
-          ctx,
-          'multi_key_mode',
-          'Codex channels do not support batch creation'
-        )
-      }
-      if (data.key?.trim() && !isCodexCredential(data.key)) {
-        addRequiredIssue(
-          ctx,
-          'key',
-          'Codex credential must be a JSON object with access_token and account_id'
-        )
-      }
-    }
-
-    if (
-      data.type === 41 &&
-      data.vertex_key_type === 'json' &&
-      data.key?.trim() &&
-      !isVertexJsonKey(data.key)
-    ) {
-      addRequiredIssue(
-        ctx,
-        'key',
-        'Vertex AI service account key must be valid JSON'
-      )
-    }
-
-    if (
-      data.type === 41 &&
-      data.vertex_key_type === 'api_key' &&
-      data.multi_key_mode &&
-      data.multi_key_mode !== 'single'
-    ) {
-      addRequiredIssue(
-        ctx,
-        'multi_key_mode',
-        'Vertex AI API Key mode does not support batch creation'
-      )
-    }
-  })
+export const channelFormSchema = z.object({
+  name: z.string().min(1, 'Channel name is required'),
+  type: z.number().min(0, 'Channel type is required'),
+  base_url: z.string().optional(),
+  key: z.string(),
+  openai_organization: z.string().optional(),
+  models: z.string().min(1, 'At least one model is required'),
+  group: z.array(z.string()).min(1, 'At least one group is required'),
+  model_mapping: z.string().optional(),
+  priority: z.number().optional(),
+  weight: z.number().optional(),
+  test_model: z.string().optional(),
+  auto_ban: z.number().optional(),
+  status: z.number(),
+  status_code_mapping: z.string().optional(),
+  tag: z.string().optional(),
+  remark: z
+    .string()
+    .max(255, 'Remark must be less than 255 characters')
+    .optional(),
+  setting: z.string().optional(),
+  param_override: z.string().optional(),
+  header_override: z.string().optional(),
+  settings: z.string().optional(),
+  other: z.string().optional(),
+  // Multi-key options (not sent to backend directly)
+  multi_key_mode: z.enum(['single', 'batch', 'multi_to_single']).optional(),
+  multi_key_type: z.enum(['random', 'polling']).optional(),
+  batch_add_set_key_prefix_2_name: z.boolean().optional(),
+  key_mode: z.enum(['append', 'replace']).optional(), // For editing multi-key channels
+  // Channel extra settings (stored in setting JSON, not sent directly)
+  force_format: z.boolean().optional(),
+  thinking_to_content: z.boolean().optional(),
+  proxy: z.string().optional(),
+  pass_through_body_enabled: z.boolean().optional(),
+  system_prompt: z.string().optional(),
+  system_prompt_override: z.boolean().optional(),
+  // Type-specific settings (stored in settings JSON)
+  is_enterprise_account: z.boolean().optional(), // OpenRouter specific
+  vertex_key_type: z.enum(['json', 'api_key']).optional(), // Vertex AI specific
+  aws_key_type: z.enum(['ak_sk', 'api_key']).optional(), // AWS specific
+  azure_responses_version: z.string().optional(), // Azure specific
+  w3_oauth_enabled: z.boolean().optional(), // MiniMax W3 OAuth
+  w3_provider_id: z.string().optional(),
+  w3_verify_tls: z.boolean().optional(),
+  w3_api_base_url: z.string().optional(),
+  w3_auth_url: z.string().optional(),
+  w3_token_url: z.string().optional(),
+  w3_refresh_url: z.string().optional(),
+  w3_client_id: z.string().optional(),
+  w3_callback_url_base: z.string().optional(),
+  w3_scope: z.string().optional(),
+  // Field passthrough controls (stored in settings JSON)
+  allow_service_tier: z.boolean().optional(), // OpenAI/Anthropic
+  disable_store: z.boolean().optional(), // OpenAI only
+  allow_safety_identifier: z.boolean().optional(), // OpenAI only
+  allow_include_obfuscation: z.boolean().optional(), // OpenAI: include usage obfuscation
+  allow_inference_geo: z.boolean().optional(), // OpenAI/Anthropic: inference geography
+  allow_speed: z.boolean().optional(), // Anthropic: speed mode control
+  claude_beta_query: z.boolean().optional(), // Anthropic: beta query passthrough
+  // Upstream model update settings (stored in settings JSON)
+  upstream_model_update_check_enabled: z.boolean().optional(),
+  upstream_model_update_auto_sync_enabled: z.boolean().optional(),
+  upstream_model_update_ignored_models: z.string().optional(),
+})
 
 export type ChannelFormValues = z.infer<typeof channelFormSchema>
 
@@ -305,6 +143,16 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   vertex_key_type: 'json',
   aws_key_type: 'ak_sk',
   azure_responses_version: '',
+  w3_oauth_enabled: false,
+  w3_provider_id: W3_DEFAULTS.providerId,
+  w3_verify_tls: false,
+  w3_api_base_url: W3_DEFAULTS.apiBaseUrl,
+  w3_auth_url: W3_DEFAULTS.authUrl,
+  w3_token_url: `${W3_DEFAULTS.apiBaseUrl}/oauth/getToken`,
+  w3_refresh_url: `${W3_DEFAULTS.apiBaseUrl}/oauth/refreshToken`,
+  w3_client_id: W3_DEFAULTS.clientId,
+  w3_callback_url_base: `${W3_DEFAULTS.apiBaseUrl}/oauth/callback`,
+  w3_scope: W3_DEFAULTS.scope,
   // Field passthrough controls
   allow_service_tier: false,
   disable_store: false,
@@ -360,6 +208,16 @@ export function transformChannelToFormDefaults(
   let azureResponsesVersion = ''
   let isEnterpriseAccount = false
   let awsKeyType: 'ak_sk' | 'api_key' = 'ak_sk'
+  let w3OAuthEnabled = false
+  let w3ProviderId = W3_DEFAULTS.providerId
+  let w3VerifyTls = false
+  let w3ApiBaseUrl = W3_DEFAULTS.apiBaseUrl
+  let w3AuthUrl = W3_DEFAULTS.authUrl
+  let w3TokenUrl = `${W3_DEFAULTS.apiBaseUrl}/oauth/getToken`
+  let w3RefreshUrl = `${W3_DEFAULTS.apiBaseUrl}/oauth/refreshToken`
+  let w3ClientId = W3_DEFAULTS.clientId
+  let w3CallbackUrlBase = `${W3_DEFAULTS.apiBaseUrl}/oauth/callback`
+  let w3Scope = W3_DEFAULTS.scope
   let allowServiceTier = false
   let disableStore = false
   let allowSafetyIdentifier = false
@@ -378,6 +236,19 @@ export function transformChannelToFormDefaults(
       azureResponsesVersion = parsed.azure_responses_version || ''
       isEnterpriseAccount = parsed.openrouter_enterprise === true
       awsKeyType = parsed.aws_key_type || 'ak_sk'
+      w3OAuthEnabled = parsed.w3_oauth_enabled === true
+      w3ProviderId = parsed.w3_provider_id || W3_DEFAULTS.providerId
+      w3VerifyTls = parsed.w3_verify_tls === true
+      w3ApiBaseUrl = parsed.w3_api_base_url || W3_DEFAULTS.apiBaseUrl
+      w3AuthUrl = parsed.w3_auth_url || W3_DEFAULTS.authUrl
+      w3TokenUrl =
+        parsed.w3_token_url || `${w3ApiBaseUrl}/oauth/getToken`
+      w3RefreshUrl =
+        parsed.w3_refresh_url || `${w3ApiBaseUrl}/oauth/refreshToken`
+      w3ClientId = parsed.w3_client_id || W3_DEFAULTS.clientId
+      w3CallbackUrlBase =
+        parsed.w3_callback_url_base || `${w3ApiBaseUrl}/oauth/callback`
+      w3Scope = parsed.w3_scope || W3_DEFAULTS.scope
       allowServiceTier = parsed.allow_service_tier === true
       disableStore = parsed.disable_store === true
       allowSafetyIdentifier = parsed.allow_safety_identifier === true
@@ -433,6 +304,16 @@ export function transformChannelToFormDefaults(
     vertex_key_type: vertexKeyType,
     azure_responses_version: azureResponsesVersion,
     aws_key_type: awsKeyType,
+    w3_oauth_enabled: w3OAuthEnabled,
+    w3_provider_id: w3ProviderId,
+    w3_verify_tls: w3VerifyTls,
+    w3_api_base_url: w3ApiBaseUrl,
+    w3_auth_url: w3AuthUrl,
+    w3_token_url: w3TokenUrl,
+    w3_refresh_url: w3RefreshUrl,
+    w3_client_id: w3ClientId,
+    w3_callback_url_base: w3CallbackUrlBase,
+    w3_scope: w3Scope,
     allow_service_tier: allowServiceTier,
     disable_store: disableStore,
     allow_include_obfuscation: allowIncludeObfuscation,
@@ -505,6 +386,44 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     delete settingsObj.aws_key_type
   }
 
+  const w3SettingKeys = [
+    'w3_oauth_enabled',
+    'w3_provider_id',
+    'w3_verify_tls',
+    'w3_api_base_url',
+    'w3_auth_url',
+    'w3_token_url',
+    'w3_refresh_url',
+    'w3_client_id',
+    'w3_callback_url_base',
+    'w3_scope',
+  ]
+
+  if (formData.type === 35 && formData.w3_oauth_enabled === true) {
+    settingsObj.w3_oauth_enabled = true
+    settingsObj.w3_provider_id =
+      formData.w3_provider_id || W3_DEFAULTS.providerId
+    settingsObj.w3_verify_tls = formData.w3_verify_tls === true
+    settingsObj.w3_api_base_url =
+      formData.w3_api_base_url || W3_DEFAULTS.apiBaseUrl
+    settingsObj.w3_auth_url = formData.w3_auth_url || W3_DEFAULTS.authUrl
+    settingsObj.w3_token_url =
+      formData.w3_token_url ||
+      `${settingsObj.w3_api_base_url}/oauth/getToken`
+    settingsObj.w3_refresh_url =
+      formData.w3_refresh_url ||
+      `${settingsObj.w3_api_base_url}/oauth/refreshToken`
+    settingsObj.w3_client_id = formData.w3_client_id || W3_DEFAULTS.clientId
+    settingsObj.w3_callback_url_base =
+      formData.w3_callback_url_base ||
+      `${settingsObj.w3_api_base_url}/oauth/callback`
+    settingsObj.w3_scope = formData.w3_scope || W3_DEFAULTS.scope
+  } else {
+    w3SettingKeys.forEach((key) => {
+      if (key in settingsObj) delete settingsObj[key]
+    })
+  }
+
   // Field passthrough controls:
   // - OpenAI (type 1) and Anthropic (type 14): allow_service_tier
   // - OpenAI only: disable_store, allow_safety_identifier
@@ -570,12 +489,6 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
   return JSON.stringify(settingsObj)
 }
 
-function normalizeBaseUrl(value: string | undefined): string {
-  return String(value || '')
-    .trim()
-    .replace(/\/+$/, '')
-}
-
 /**
  * Transform form data to API payload for creating channel
  */
@@ -590,7 +503,7 @@ export function transformFormDataToCreatePayload(formData: ChannelFormValues): {
   const channel: Partial<Channel> = {
     name: formData.name,
     type: formData.type,
-    base_url: normalizeBaseUrl(formData.base_url) || null,
+    base_url: formData.base_url || null,
     key: formData.key,
     openai_organization: formData.openai_organization || null,
     models: formData.models,
@@ -639,13 +552,13 @@ export function transformFormDataToUpdatePayload(
     id: channelId,
     name: formData.name,
     type: formData.type,
-    base_url: normalizeBaseUrl(formData.base_url) || null,
+    base_url: formData.base_url || null,
     openai_organization: formData.openai_organization || null,
     models: formData.models,
     group: formatGroups(formData.group),
     model_mapping: formData.model_mapping || null,
-    priority: formData.priority ?? 0,
-    weight: formData.weight ?? 0,
+    priority: formData.priority || null,
+    weight: formData.weight || null,
     test_model: formData.test_model || null,
     auto_ban: formData.auto_ban ?? 1,
     status: formData.status,
@@ -671,12 +584,7 @@ export function transformFormDataToUpdatePayload(
     }
   })
 
-  // Send explicit empty strings for nullable fields so GORM updates can clear them.
-  payload.base_url = normalizeBaseUrl(formData.base_url) || ''
-  payload.openai_organization = formData.openai_organization || ''
-  payload.test_model = formData.test_model || ''
-  payload.tag = formData.tag || ''
-  payload.remark = formData.remark || ''
+  // Send explicit empty strings for nullable JSON/text fields so GORM updates can clear them.
   payload.model_mapping = formData.model_mapping || ''
   payload.status_code_mapping = formData.status_code_mapping || ''
   payload.param_override = formData.param_override || ''

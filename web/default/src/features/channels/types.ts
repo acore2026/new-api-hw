@@ -92,6 +92,16 @@ export interface ChannelOtherSettings {
   azure_responses_version?: string
   vertex_key_type?: 'json' | 'api_key'
   openrouter_enterprise?: boolean
+  w3_oauth_enabled?: boolean
+  w3_provider_id?: string
+  w3_verify_tls?: boolean
+  w3_api_base_url?: string
+  w3_auth_url?: string
+  w3_token_url?: string
+  w3_refresh_url?: string
+  w3_client_id?: string
+  w3_callback_url_base?: string
+  w3_scope?: string
   aws_key_type?: 'ak_sk' | 'api_key'
   allow_service_tier?: boolean
   disable_store?: boolean
