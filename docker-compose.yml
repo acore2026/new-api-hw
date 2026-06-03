@@ -16,7 +16,7 @@ version: '3.4' # For compatibility with older Docker versions
 
 services:
   new-api:
-    image: ${NEW_API_IMAGE:-hellodrf/new-api:w3}
+    image: ${NEW_API_IMAGE:-ghcr.io/acore2026/new-api-hw:w3}
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
