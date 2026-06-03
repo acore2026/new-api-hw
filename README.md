@@ -52,6 +52,133 @@
 
 </div>
 
+## Huawei W3 MiniMax Guide
+
+This fork is packaged for Huawei W3 SSO access to MiniMax through New API.
+Use it when you want Claude/OpenAI-compatible clients to call the internal W3
+MiniMax OpenAI-compatible endpoint.
+
+### Container Image
+
+The W3 image is published on GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/acore2026/new-api-hw:w3
+```
+
+The included `docker-compose.yml` uses this image by default:
+
+```yaml
+image: ${NEW_API_IMAGE:-ghcr.io/acore2026/new-api-hw:w3}
+```
+
+You can still override the image without editing the file:
+
+```bash
+NEW_API_IMAGE=ghcr.io/acore2026/new-api-hw:w3 docker compose up -d
+```
+
+### Deploy
+
+```bash
+git clone https://github.com/acore2026/new-api-hw.git
+cd new-api-hw
+docker compose pull
+docker compose up -d
+```
+
+The default compose file exposes New API on `http://localhost:7666`.
+Change the database, Redis, and session secrets before production use.
+
+### Create a W3 MiniMax Channel
+
+1. Sign in as an administrator.
+2. Open the channel management page and create a new channel.
+3. Select channel type `MiniMax`.
+4. Enable `Huawei W3 OAuth`.
+5. Keep the default W3 endpoint settings unless your internal environment needs
+   a different W3 base URL, client ID, provider ID, or scope.
+6. Click `Authorize`, complete Huawei SSO in the browser, and wait for the key
+   field to be filled with W3 JSON credentials.
+7. Set the model list, for example `MiniMax-M2.7`.
+8. Save the channel.
+
+W3 credentials are stored as channel-key JSON:
+
+```json
+{
+  "type": "w3",
+  "access_token": "...",
+  "refresh_token": "...",
+  "expired": "2026-06-03T00:00:00Z",
+  "last_refresh": "2026-06-03T00:00:00Z"
+}
+```
+
+Saved W3 channels can refresh credentials from the channel drawer. The backend
+also runs an automatic refresh task for W3 MiniMax channels.
+
+### Client Access
+
+Create a New API token in the dashboard, then use either OpenAI chat
+completions or Claude messages clients.
+
+OpenAI-compatible request:
+
+```bash
+curl -N http://localhost:7666/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-your-new-api-token" \
+  -d '{
+    "model": "MiniMax-M2.7",
+    "messages": [{"role": "user", "content": "hello"}],
+    "stream": true
+  }'
+```
+
+Claude-compatible request:
+
+```bash
+curl -N http://localhost:7666/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-your-new-api-token" \
+  -d '{
+    "model": "MiniMax-M2.7",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "hello"}],
+    "stream": true
+  }'
+```
+
+### W3 Behavior Notes
+
+- W3 MiniMax is implemented as a MiniMax channel option, not a separate channel
+  type.
+- W3 traffic is sent to `/codeAgentPro/chat/completions` through the
+  OpenAI-compatible request shape.
+- Claude messages requests are converted to OpenAI chat completions before they
+  are sent upstream.
+- W3 mode sends `X-Auth-Token` and `X-Provider-ID`; it does not send an
+  upstream `Authorization` bearer token.
+- W3 mode removes unsupported fields such as `stream_options`.
+- W3 internal endpoints are forced to connect directly instead of using the
+  configured corporate proxy.
+- TLS verification is disabled by default for W3 internal PKI. Enable
+  `W3 Verify TLS` only when the runtime trusts the internal CA.
+- MiniMax image and audio routes are not supported in W3 mode.
+
+### Troubleshooting
+
+| Symptom | Check |
+|------|------|
+| OAuth keeps saying token is not ready | Reuse the same authorization dialog URL until SSO completes. Opening a new authorization page creates a new client code. |
+| OAuth token response is not valid JSON | Check W3 endpoint overrides and whether the request reached the internal W3 service directly. |
+| Requests fail from a corporate WSL machine | W3 endpoints are forced direct by this fork; make sure internal DNS/routing works inside WSL. |
+| Streaming ends with `scanner_error` | Use the W3 image from this fork; W3 streaming requests do not use the old 30 second total HTTP timeout. |
+| GitHub image pull requires login | Run `docker login ghcr.io` with a GitHub token that can read packages, or make the package public. |
+
+---
+
 ## 📝 Project Description
 
 > [!IMPORTANT]
