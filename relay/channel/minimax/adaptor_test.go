@@ -297,6 +297,33 @@ func TestConvertOpenAIRequestForW3StripsAnthropicBillingHeader(t *testing.T) {
 	}
 }
 
+func TestConvertOpenAIRequestForW3StripsEverythingBeforeClaudeCodeMarker(t *testing.T) {
+	t.Parallel()
+
+	request := &dto.GeneralOpenAIRequest{
+		Model: "MiniMax-M2.7",
+		Messages: []dto.Message{
+			{Role: "system", Content: "x-anthropic-billing-header: cc_version=2.1.160.299; cc_entrypoint=cli; cch=e9aa1; extra=ignored;You are Claude Code, Anthropic's official CLI for Claude."},
+		},
+	}
+	info := &relaycommon.RelayInfo{
+		RelayMode: relayconstant.RelayModeChatCompletions,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelOtherSettings: dto.ChannelOtherSettings{W3OAuthEnabled: true},
+		},
+	}
+
+	got, err := (&Adaptor{}).ConvertOpenAIRequest(nil, info, request)
+	if err != nil {
+		t.Fatalf("ConvertOpenAIRequest returned error: %v", err)
+	}
+	converted := got.(*dto.GeneralOpenAIRequest)
+	want := "You are Claude Code, Anthropic's official CLI for Claude."
+	if gotContent := converted.Messages[0].StringContent(); gotContent != want {
+		t.Fatalf("message content = %q, want %q", gotContent, want)
+	}
+}
+
 func TestConvertOpenAIRequestForW3StripsCacheControl(t *testing.T) {
 	t.Parallel()
 

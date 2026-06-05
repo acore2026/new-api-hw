@@ -414,6 +414,16 @@ func normalizeW3ToolCallID(id string) string {
 func stripW3AnthropicBillingHeaderPrefix(content string) string {
 	trimmedLeft := strings.TrimLeft(content, " \t\r\n")
 	original := trimmedLeft
+	const claudeCodePromptMarker = "You are Claude Code"
+	if markerIdx := strings.Index(trimmedLeft, claudeCodePromptMarker); markerIdx > 0 {
+		prefixText := strings.ToLower(trimmedLeft[:markerIdx])
+		if strings.Contains(prefixText, "x-anthropic-billing-header:") ||
+			strings.Contains(prefixText, "cc_version=") ||
+			strings.Contains(prefixText, "cc_entrypoint=") ||
+			strings.Contains(prefixText, "cch=") {
+			return trimmedLeft[markerIdx:]
+		}
+	}
 	const prefix = "x-anthropic-billing-header:"
 	if strings.HasPrefix(strings.ToLower(trimmedLeft), prefix) {
 		trimmedLeft = strings.TrimLeft(trimmedLeft[len(prefix):], " \t\r\n")
