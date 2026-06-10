@@ -207,6 +207,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			break
 		}
+		service.CaptureMessageTraceFromBodyStorage(c, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		switch relayFormat {
@@ -544,6 +545,7 @@ func RelayTask(c *gin.Context) {
 			}
 			break
 		}
+		service.CaptureMessageTraceFromBodyStorage(c, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)

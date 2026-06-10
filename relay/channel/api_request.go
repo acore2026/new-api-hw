@@ -309,6 +309,9 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	var finalizeTrace func()
+	requestBody, finalizeTrace = service.WrapFinalMessageTraceReader(c, requestBody)
+	defer finalizeTrace()
 	logger.LogDebug(c, "fullRequestURL: %s", fullRequestURL)
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
@@ -537,6 +540,9 @@ func DoTaskApiRequest(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, req
 	if err != nil {
 		return nil, err
 	}
+	var finalizeTrace func()
+	requestBody, finalizeTrace = service.WrapFinalMessageTraceReader(c, requestBody)
+	defer finalizeTrace()
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)

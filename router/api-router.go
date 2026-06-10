@@ -316,6 +316,9 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
+		logRoute.GET("/message_trace", middleware.AdminAuth(), controller.GetMessageTraceStatus)
+		logRoute.POST("/message_trace", middleware.AdminAuth(), controller.EnableMessageTrace)
+		logRoute.DELETE("/message_trace", middleware.AdminAuth(), controller.DisableMessageTrace)
 
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)

@@ -421,6 +421,10 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const showAdminIp =
     !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
   const adminInfo = other?.admin_info
+  const messageTrace =
+    props.isAdmin && adminInfo?.message_trace?.body
+      ? adminInfo.message_trace
+      : null
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
       ? ([
@@ -666,6 +670,109 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 variant='danger'
               >
                 <p className='text-xs break-words'>{other.reject_reason}</p>
+              </DetailSection>
+            )}
+
+            {/* Message trace (admin only, short-lived debug capture) */}
+            {messageTrace && (
+              <DetailSection
+                icon={<Info className='size-3.5' aria-hidden='true' />}
+                label={t('Message Trace')}
+              >
+                <div className='space-y-1.5'>
+                  <div className='flex flex-wrap gap-x-4 gap-y-1'>
+                    {messageTrace.body_bytes != null && (
+                      <DetailRow
+                        label={t('Original Size')}
+                        value={`${messageTrace.body_bytes} B`}
+                        mono
+                      />
+                    )}
+                    {messageTrace.final_body_bytes != null && (
+                      <DetailRow
+                        label={t('Final Size')}
+                        value={`${messageTrace.final_body_bytes} B`}
+                        mono
+                      />
+                    )}
+                    {messageTrace.max_bytes != null && (
+                      <DetailRow
+                        label={t('Max Capture')}
+                        value={`${messageTrace.max_bytes} B`}
+                        mono
+                      />
+                    )}
+                    {messageTrace.truncated && (
+                      <DetailRow
+                        label={t('Truncated')}
+                        value={t('Yes')}
+                      />
+                    )}
+                    {messageTrace.final_truncated && (
+                      <DetailRow
+                        label={t('Final Truncated')}
+                        value={t('Yes')}
+                      />
+                    )}
+                  </div>
+                  {messageTrace.redaction_note && (
+                    <p className='text-muted-foreground text-xs break-words'>
+                      {messageTrace.redaction_note}
+                    </p>
+                  )}
+                  <div className='space-y-1'>
+                    <Label className='text-muted-foreground text-xs'>
+                      {t('Original Received Message')}
+                    </Label>
+                    <div className='relative'>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='absolute top-1.5 right-1.5 h-5 w-5 p-0'
+                        onClick={() => copyToClipboard(messageTrace.body || '')}
+                        title={t('Copy to clipboard')}
+                        aria-label={t('Copy to clipboard')}
+                      >
+                        {copiedText === messageTrace.body ? (
+                          <Check className='size-3 text-green-600' />
+                        ) : (
+                          <Copy className='size-3' />
+                        )}
+                      </Button>
+                      <pre className='bg-background/60 max-h-72 overflow-y-auto rounded border p-2 pr-8 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap'>
+                        {messageTrace.body}
+                      </pre>
+                    </div>
+                  </div>
+                  {messageTrace.final_body && (
+                    <div className='space-y-1'>
+                      <Label className='text-muted-foreground text-xs'>
+                        {t('Final Sent Message')}
+                      </Label>
+                      <div className='relative'>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='absolute top-1.5 right-1.5 h-5 w-5 p-0'
+                          onClick={() =>
+                            copyToClipboard(messageTrace.final_body || '')
+                          }
+                          title={t('Copy to clipboard')}
+                          aria-label={t('Copy to clipboard')}
+                        >
+                          {copiedText === messageTrace.final_body ? (
+                            <Check className='size-3 text-green-600' />
+                          ) : (
+                            <Copy className='size-3' />
+                          )}
+                        </Button>
+                        <pre className='bg-background/60 max-h-72 overflow-y-auto rounded border p-2 pr-8 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap'>
+                          {messageTrace.final_body}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </DetailSection>
             )}
 

@@ -176,6 +176,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 		if err != nil {
 			return nil, fmt.Errorf("read w3 request body failed: %w", err)
 		}
+		service.CaptureFinalMessageTrace(c, body)
 		resp, err := doW3RequestOnce(a, c, info, body)
 		if err != nil {
 			return nil, err

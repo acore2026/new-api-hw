@@ -17,11 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useQueryClient, useIsFetching } from '@tanstack/react-query'
+import {
+  useQueryClient,
+  useIsFetching,
+  useMutation,
+} from '@tanstack/react-query'
 import { useNavigate, getRouteApi } from '@tanstack/react-router'
 import { type Table } from '@tanstack/react-table'
-import { Eye, EyeOff } from 'lucide-react'
+import { Bug, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { useIsAdmin } from '@/hooks/use-admin'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +42,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { enableMessageTrace } from '../api'
 import { LOG_TYPE_ALL_VALUE, LOG_TYPE_FILTERS } from '../constants'
 import { buildSearchParams } from '../lib/filter'
 import { getDefaultTimeRange } from '../lib/utils'
@@ -73,6 +79,19 @@ export function CommonLogsFilterBar<TData>(
   const isAdmin = useIsAdmin()
   const { sensitiveVisible, setSensitiveVisible } = useUsageLogsContext()
   const fetchingLogs = useIsFetching({ queryKey: ['logs'] })
+  const messageTraceMutation = useMutation({
+    mutationFn: enableMessageTrace,
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t('Message trace enabled for 1 minute'))
+      } else {
+        toast.error(result.message || t('Failed to enable message trace'))
+      }
+    },
+    onError: () => {
+      toast.error(t('Failed to enable message trace'))
+    },
+  })
 
   const [filters, setFilters] = useState<CommonLogFilters>(() => {
     const { start, end } = getDefaultTimeRange()
@@ -199,6 +218,27 @@ export function CommonLogsFilterBar<TData>(
   const statsBar = (
     <div className='flex flex-wrap items-center gap-2'>
       <CommonLogsStats />
+      {isAdmin && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant='ghost'
+                size='icon'
+                onClick={() => messageTraceMutation.mutate()}
+                disabled={messageTraceMutation.isPending}
+                aria-label={t('Enable message trace for 1 minute')}
+                className='text-muted-foreground hover:text-foreground size-7'
+              />
+            }
+          >
+            <Bug />
+          </TooltipTrigger>
+          <TooltipContent>
+            {t('Enable message trace for 1 minute')}
+          </TooltipContent>
+        </Tooltip>
+      )}
       <Tooltip>
         <TooltipTrigger
           render={
