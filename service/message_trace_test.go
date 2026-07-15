@@ -1,6 +1,8 @@
 package service
 
 import (
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -24,6 +26,20 @@ func TestMessageTraceCaptureRedactsAndTruncates(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	CaptureMessageTraceFromBodyStorage(ctx, storage)
 	CaptureFinalMessageTrace(ctx, []byte(`{"api_key":"sk-finalsecret","messages":[{"role":"user","content":"hello"}]}`))
+	responseBody := `data: {"access_token":"response-secret","choices":[]}` + "\n\n"
+	response := &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        http.Header{"Content-Type": []string{"text/event-stream"}},
+		ContentLength: int64(len(responseBody)),
+		Body:          io.NopCloser(strings.NewReader(responseBody)),
+	}
+	WrapUpstreamResponseTrace(ctx, response)
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		t.Fatalf("read traced response: %v", err)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("close traced response: %v", err)
+	}
 
 	adminInfo := map[string]interface{}{}
 	AttachMessageTrace(ctx, adminInfo)
@@ -54,6 +70,25 @@ func TestMessageTraceCaptureRedactsAndTruncates(t *testing.T) {
 	}
 	if got, _ := trace["final_body_bytes"].(int); got == 0 {
 		t.Fatalf("final_body_bytes not recorded: %#v", trace)
+	}
+	if got, _ := trace["upstream_status"].(int); got != http.StatusOK {
+		t.Fatalf("upstream_status = %d, want %d", got, http.StatusOK)
+	}
+	if got, _ := trace["upstream_content_type"].(string); got != "text/event-stream" {
+		t.Fatalf("upstream_content_type = %q", got)
+	}
+	upstreamBody, _ := trace["upstream_body"].(string)
+	if strings.Contains(upstreamBody, "response-secret") {
+		t.Fatalf("upstream trace body leaked token: %s", upstreamBody)
+	}
+	if !strings.Contains(upstreamBody, "<redacted>") {
+		t.Fatalf("upstream trace body did not contain redaction marker: %s", upstreamBody)
+	}
+	if got, _ := trace["upstream_body_bytes"].(int64); got != int64(len(responseBody)) {
+		t.Fatalf("upstream_body_bytes = %d, want %d", got, len(responseBody))
+	}
+	if complete, _ := trace["upstream_complete"].(bool); !complete {
+		t.Fatalf("expected complete upstream capture: %#v", trace)
 	}
 }
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"io"
+	"net/http"
 	"regexp"
 	"strconv"
 	"sync"
@@ -41,6 +42,61 @@ type messageTraceFinalReader struct {
 	mu     sync.Mutex
 	buf    []byte
 	total  int64
+}
+
+type messageTraceResponseBody struct {
+	body io.ReadCloser
+	ctx  *gin.Context
+	max  int64
+
+	mu       sync.Mutex
+	buf      []byte
+	total    int64
+	complete bool
+	once     sync.Once
+}
+
+func (r *messageTraceResponseBody) Read(p []byte) (int, error) {
+	n, err := r.body.Read(p)
+	r.mu.Lock()
+	if n > 0 {
+		r.total += int64(n)
+		remaining := int(r.max) - len(r.buf)
+		if remaining > 0 {
+			if n < remaining {
+				remaining = n
+			}
+			r.buf = append(r.buf, p[:remaining]...)
+		}
+	}
+	if err == io.EOF {
+		r.complete = true
+	}
+	r.mu.Unlock()
+	return n, err
+}
+
+func (r *messageTraceResponseBody) Close() error {
+	err := r.body.Close()
+	r.once.Do(func() {
+		r.mu.Lock()
+		raw := append([]byte(nil), r.buf...)
+		total := r.total
+		complete := r.complete
+		r.mu.Unlock()
+
+		body, truncated := sanitizeMessageTraceBody(raw, r.max)
+		if total > int64(len(raw)) {
+			truncated = true
+		}
+		attachMessageTraceFields(r.ctx, map[string]interface{}{
+			"upstream_body":       body,
+			"upstream_body_bytes": total,
+			"upstream_complete":   complete,
+			"upstream_truncated":  truncated,
+		})
+	})
+	return err
 }
 
 func (r *messageTraceFinalReader) Read(p []byte) (int, error) {
@@ -148,6 +204,40 @@ func CaptureFinalMessageTrace(ctx *gin.Context, rawBody []byte) {
 		"final_body_bytes": len(rawBody),
 		"final_truncated":  truncated,
 	})
+}
+
+// WrapUpstreamResponseTrace captures a bounded, redacted copy of an upstream
+// response while the temporary message trace is enabled. The wrapper preserves
+// normal response streaming and records whether the consumer reached EOF.
+func WrapUpstreamResponseTrace(ctx *gin.Context, resp *http.Response) {
+	if ctx == nil || resp == nil {
+		return
+	}
+	snapshot := GetMessageTraceSnapshot()
+	if !snapshot.Enabled {
+		return
+	}
+
+	attachMessageTraceFields(ctx, map[string]interface{}{
+		"upstream_status":         resp.StatusCode,
+		"upstream_content_type":   resp.Header.Get("Content-Type"),
+		"upstream_content_length": resp.ContentLength,
+	})
+	if resp.Body == nil {
+		attachMessageTraceFields(ctx, map[string]interface{}{
+			"upstream_body":       "",
+			"upstream_body_bytes": int64(0),
+			"upstream_complete":   true,
+			"upstream_truncated":  false,
+		})
+		return
+	}
+
+	resp.Body = &messageTraceResponseBody{
+		body: resp.Body,
+		ctx:  ctx,
+		max:  snapshot.MaxBytes,
+	}
 }
 
 func CaptureMessageTrace(ctx *gin.Context, rawBody []byte) {

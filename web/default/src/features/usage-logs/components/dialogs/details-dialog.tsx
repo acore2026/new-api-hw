@@ -695,6 +695,33 @@ export function DetailsDialog(props: DetailsDialogProps) {
                         mono
                       />
                     )}
+                    {messageTrace.upstream_status != null && (
+                      <DetailRow
+                        label={t('Status')}
+                        value={messageTrace.upstream_status}
+                        mono
+                      />
+                    )}
+                    {messageTrace.upstream_content_type && (
+                      <DetailRow
+                        label={t('Content-Type')}
+                        value={messageTrace.upstream_content_type}
+                        mono
+                      />
+                    )}
+                    {messageTrace.upstream_body_bytes != null && (
+                      <DetailRow
+                        label={t('Response Size')}
+                        value={`${messageTrace.upstream_body_bytes} B`}
+                        mono
+                      />
+                    )}
+                    {messageTrace.upstream_complete != null && (
+                      <DetailRow
+                        label={t('Capture Complete')}
+                        value={t(messageTrace.upstream_complete ? 'Yes' : 'No')}
+                      />
+                    )}
                     {messageTrace.max_bytes != null && (
                       <DetailRow
                         label={t('Max Capture')}
@@ -703,16 +730,16 @@ export function DetailsDialog(props: DetailsDialogProps) {
                       />
                     )}
                     {messageTrace.truncated && (
-                      <DetailRow
-                        label={t('Truncated')}
-                        value={t('Yes')}
-                      />
+                      <DetailRow label={t('Truncated')} value={t('Yes')} />
                     )}
                     {messageTrace.final_truncated && (
                       <DetailRow
                         label={t('Final Truncated')}
                         value={t('Yes')}
                       />
+                    )}
+                    {messageTrace.upstream_truncated && (
+                      <DetailRow label={t('Truncated')} value={t('Yes')} />
                     )}
                   </div>
                   {messageTrace.redaction_note && (
@@ -768,6 +795,34 @@ export function DetailsDialog(props: DetailsDialogProps) {
                         </Button>
                         <pre className='bg-background/60 max-h-72 overflow-y-auto rounded border p-2 pr-8 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap'>
                           {messageTrace.final_body}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                  {messageTrace.upstream_body != null && (
+                    <div className='flex flex-col gap-1'>
+                      <Label className='text-muted-foreground text-xs'>
+                        {t('Upstream Response')}
+                      </Label>
+                      <div className='relative'>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='absolute top-1.5 right-1.5 h-5 w-5 p-0'
+                          onClick={() =>
+                            copyToClipboard(messageTrace.upstream_body || '')
+                          }
+                          title={t('Copy to clipboard')}
+                          aria-label={t('Copy to clipboard')}
+                        >
+                          {copiedText === messageTrace.upstream_body ? (
+                            <Check className='size-3 text-green-600' />
+                          ) : (
+                            <Copy className='size-3' />
+                          )}
+                        </Button>
+                        <pre className='bg-background/60 max-h-72 overflow-y-auto rounded border p-2 pr-8 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap'>
+                          {messageTrace.upstream_body || t('Empty')}
                         </pre>
                       </div>
                     </div>

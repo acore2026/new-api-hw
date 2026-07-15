@@ -518,7 +518,15 @@ func doW3RequestOnce(a *Adaptor, c *gin.Context, info *relaycommon.RelayInfo, re
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
-	logger.LogDebug(c.Request.Context(), fmt.Sprintf("w3 minimax response: channel_id=%d url=%s status=%d", info.ChannelId, fullRequestURL, resp.StatusCode))
+	service.WrapUpstreamResponseTrace(c, resp)
+	logger.LogDebug(c.Request.Context(), fmt.Sprintf(
+		"w3 minimax response: channel_id=%d url=%s status=%d content_type=%q content_length=%d",
+		info.ChannelId,
+		fullRequestURL,
+		resp.StatusCode,
+		resp.Header.Get("Content-Type"),
+		resp.ContentLength,
+	))
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		logW3MinimaxBadResponse(c, info, fullRequestURL, resp)
 	}

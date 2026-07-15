@@ -118,6 +118,13 @@ export interface LogOtherData {
       final_body?: string
       final_body_bytes?: number
       final_truncated?: boolean
+      upstream_status?: number
+      upstream_content_type?: string
+      upstream_content_length?: number
+      upstream_body?: string
+      upstream_body_bytes?: number
+      upstream_complete?: boolean
+      upstream_truncated?: boolean
       max_bytes?: number
       truncated?: boolean
       redaction_note?: string
