@@ -1,6 +1,7 @@
 package minimax
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,9 +35,38 @@ type Adaptor struct {
 
 const (
 	defaultW3MaxTokensLimit = uint(24576)
+	w3ResponseProbeMaxBytes = 64 << 10
 )
 
 var w3UnsafeToolCallIDPattern = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
+
+type w3EmbeddedErrorDetails struct {
+	ErrorCode string `json:"error_code"`
+	ErrorMsg  string `json:"error_msg"`
+}
+
+type w3EmbeddedErrorResponse struct {
+	Error     *w3EmbeddedErrorDetails `json:"error"`
+	ErrorCode string                  `json:"error_code"`
+	ErrorMsg  string                  `json:"error_msg"`
+}
+
+type w3EmbeddedErrorMessage struct {
+	Type     string `json:"type"`
+	Message  string `json:"message"`
+	Identity string `json:"identity"`
+	Quota    int64  `json:"quota"`
+	Used     int64  `json:"used"`
+}
+
+type w3ReplayResponseBody struct {
+	io.Reader
+	closer io.ReadCloser
+}
+
+func (b *w3ReplayResponseBody) Close() error {
+	return b.closer.Close()
+}
 
 func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
 	return nil, errors.New("not implemented")
@@ -192,9 +223,12 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 			if encoded, encodeErr := service.EncodeW3OAuthKey(newKey); encodeErr == nil {
 				info.ApiKey = encoded
 			}
-			return doW3RequestOnce(a, c, info, body)
+			resp, err = doW3RequestOnce(a, c, info, body)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return resp, nil
+		return validateW3Response(c, info, resp)
 	}
 	return channel.DoApiRequest(a, c, info, requestBody)
 }
@@ -554,6 +588,174 @@ func logW3MinimaxBadResponse(c *gin.Context, info *relaycommon.RelayInfo, fullRe
 		resp.StatusCode,
 		len(responseBody),
 	))
+}
+
+func validateW3Response(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*http.Response, error) {
+	embeddedErr, err := inspectW3EmbeddedErrorResponse(resp)
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, fmt.Errorf("inspect w3 response failed: %w", err)
+	}
+	if embeddedErr == nil {
+		return resp, nil
+	}
+
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	channelID := 0
+	if info != nil && info.ChannelMeta != nil {
+		channelID = info.ChannelId
+	}
+	logContext := context.Background()
+	if c != nil && c.Request != nil {
+		logContext = c.Request.Context()
+	}
+	logger.LogWarn(logContext, fmt.Sprintf(
+		"w3 minimax embedded error: channel_id=%d normalized_status=%d error_code=%s",
+		channelID,
+		embeddedErr.StatusCode,
+		embeddedErr.GetErrorCode(),
+	))
+	return nil, embeddedErr
+}
+
+func inspectW3EmbeddedErrorResponse(resp *http.Response) (*types.NewAPIError, error) {
+	if resp == nil || resp.Body == nil || resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+
+	probe, err := readW3ResponseProbe(resp)
+	if err != nil {
+		return nil, err
+	}
+	probe = bytes.TrimSpace(probe)
+	if len(probe) == 0 || bytes.Equal(probe, []byte("[DONE]")) {
+		return nil, nil
+	}
+
+	var embedded w3EmbeddedErrorResponse
+	if err := common.Unmarshal(probe, &embedded); err != nil {
+		return nil, nil
+	}
+
+	code := strings.TrimSpace(embedded.ErrorCode)
+	message := strings.TrimSpace(embedded.ErrorMsg)
+	if embedded.Error != nil {
+		if code == "" {
+			code = strings.TrimSpace(embedded.Error.ErrorCode)
+		}
+		if message == "" {
+			message = strings.TrimSpace(embedded.Error.ErrorMsg)
+		}
+	}
+	if (code == "" || code == "0" || strings.EqualFold(code, "success")) && message == "" {
+		return nil, nil
+	}
+	if code == "" || code == "0" || strings.EqualFold(code, "success") {
+		code = "w3_embedded_error"
+	}
+
+	statusCode := w3EmbeddedErrorStatusCode(code, message)
+	return types.WithOpenAIError(types.OpenAIError{
+		Message: formatW3EmbeddedErrorMessage(code, message),
+		Type:    "upstream_error",
+		Code:    code,
+	}, statusCode), nil
+}
+
+func readW3ResponseProbe(resp *http.Response) ([]byte, error) {
+	originalBody := resp.Body
+	contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
+	if !strings.HasPrefix(contentType, "text/event-stream") {
+		body, err := io.ReadAll(originalBody)
+		if err != nil {
+			resp.Body = &w3ReplayResponseBody{
+				Reader: io.MultiReader(bytes.NewReader(body), originalBody),
+				closer: originalBody,
+			}
+			return nil, err
+		}
+		resp.Body = &w3ReplayResponseBody{Reader: bytes.NewReader(body), closer: originalBody}
+		return body, nil
+	}
+
+	reader := bufio.NewReader(originalBody)
+	prefix := bytes.NewBuffer(nil)
+	var candidate []byte
+	for prefix.Len() < w3ResponseProbeMaxBytes {
+		line, err := reader.ReadString('\n')
+		prefix.WriteString(line)
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "data:"):
+			candidate = []byte(strings.TrimSpace(strings.TrimPrefix(trimmed, "data:")))
+		case trimmed == "", strings.HasPrefix(trimmed, ":"), strings.HasPrefix(trimmed, "event:"), strings.HasPrefix(trimmed, "id:"), strings.HasPrefix(trimmed, "retry:"):
+			// Continue through SSE metadata until the first data record.
+		default:
+			candidate = []byte(trimmed)
+		}
+
+		if len(candidate) > 0 || err != nil {
+			if err != nil && !errors.Is(err, io.EOF) {
+				resp.Body = &w3ReplayResponseBody{
+					Reader: io.MultiReader(bytes.NewReader(prefix.Bytes()), reader),
+					closer: originalBody,
+				}
+				return nil, err
+			}
+			break
+		}
+	}
+
+	resp.Body = &w3ReplayResponseBody{
+		Reader: io.MultiReader(bytes.NewReader(prefix.Bytes()), reader),
+		closer: originalBody,
+	}
+	return candidate, nil
+}
+
+func w3EmbeddedErrorStatusCode(code string, message string) int {
+	if idx := strings.LastIndex(code, "."); idx >= 0 && idx+1 < len(code) {
+		if statusCode, err := strconv.Atoi(code[idx+1:]); err == nil && statusCode >= 400 && statusCode <= 599 {
+			return statusCode
+		}
+	}
+	lower := strings.ToLower(code + " " + message)
+	if strings.Contains(lower, "quota exceeded") || strings.Contains(lower, "rate limit") || strings.Contains(lower, "too many requests") {
+		return http.StatusTooManyRequests
+	}
+	return http.StatusBadGateway
+}
+
+func formatW3EmbeddedErrorMessage(code string, message string) string {
+	description := strings.TrimSpace(message)
+	var details w3EmbeddedErrorMessage
+	if description != "" && common.UnmarshalJsonStr(description, &details) == nil && details.Message != "" {
+		description = details.Message
+		metadata := make([]string, 0, 4)
+		if details.Type != "" {
+			metadata = append(metadata, "type="+details.Type)
+		}
+		if details.Identity != "" {
+			metadata = append(metadata, "identity="+details.Identity)
+		}
+		if details.Quota > 0 {
+			metadata = append(metadata, fmt.Sprintf("quota=%d", details.Quota))
+		}
+		if details.Used > 0 {
+			metadata = append(metadata, fmt.Sprintf("used=%d", details.Used))
+		}
+		if len(metadata) > 0 {
+			description += " (" + strings.Join(metadata, ", ") + ")"
+		}
+	}
+	if description == "" {
+		description = "upstream request failed"
+	}
+	return fmt.Sprintf("W3 upstream error %s: %s", code, common.MaskSensitiveInfo(description))
 }
 
 func contextWithRequestTimeout(c *gin.Context, seconds int) (context.Context, context.CancelFunc) {

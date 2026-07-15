@@ -2,6 +2,7 @@ package minimax
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -464,6 +465,138 @@ func TestLogW3MinimaxBadResponsePreservesResponseBody(t *testing.T) {
 	}
 }
 
+func TestInspectW3EmbeddedTPMErrorNormalizesHTTP200To429(t *testing.T) {
+	t.Parallel()
+
+	body := `{"text":"[DONE]","error":{"error_msg":"{\"type\":\"TPM\",\"message\":\"deny cause quota exceeded\",\"identity\":\"appId\",\"quota\":200000000,\"used\":211053088}","error_code":"InferHub.002002010.429"},"error_code":"InferHub.002002010.429","error_msg":"{\"type\":\"TPM\",\"message\":\"deny cause quota exceeded\",\"identity\":\"appId\",\"quota\":200000000,\"used\":211053088}"}`
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       ioNopCloser(body),
+	}
+
+	got, err := inspectW3EmbeddedErrorResponse(resp)
+	if err != nil {
+		t.Fatalf("inspectW3EmbeddedErrorResponse returned error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("inspectW3EmbeddedErrorResponse returned nil error")
+	}
+	if got.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status code = %d, want %d", got.StatusCode, http.StatusTooManyRequests)
+	}
+	if got.GetErrorCode() != types.ErrorCode("InferHub.002002010.429") {
+		t.Fatalf("error code = %q", got.GetErrorCode())
+	}
+	if !strings.Contains(got.Error(), "deny cause quota exceeded") ||
+		!strings.Contains(got.Error(), "quota=200000000") ||
+		!strings.Contains(got.Error(), "used=211053088") {
+		t.Fatalf("error message = %q", got.Error())
+	}
+
+	replayed, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		t.Fatalf("read replayed body: %v", readErr)
+	}
+	if string(replayed) != body {
+		t.Fatalf("replayed body = %q, want %q", string(replayed), body)
+	}
+
+	wrapped := types.NewOpenAIError(got, types.ErrorCodeDoRequestFailed, http.StatusInternalServerError)
+	if wrapped.StatusCode != http.StatusTooManyRequests || wrapped.GetErrorCode() != got.GetErrorCode() {
+		t.Fatalf("wrapped error lost retry status/code: %#v", wrapped)
+	}
+}
+
+func TestInspectW3EmbeddedErrorFromFirstSSEDataRecord(t *testing.T) {
+	t.Parallel()
+
+	payload := `{"text":"[DONE]","error":{"error_code":"InferHub.002002010.429","error_msg":"quota exceeded"}}`
+	body := "event: message\n" + "data: " + payload + "\n\n"
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
+		Body:       ioNopCloser(body),
+	}
+
+	got, err := inspectW3EmbeddedErrorResponse(resp)
+	if err != nil {
+		t.Fatalf("inspectW3EmbeddedErrorResponse returned error: %v", err)
+	}
+	if got == nil || got.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("embedded SSE error = %#v, want status 429", got)
+	}
+
+	replayed, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		t.Fatalf("read replayed SSE body: %v", readErr)
+	}
+	if string(replayed) != body {
+		t.Fatalf("replayed SSE body = %q, want %q", string(replayed), body)
+	}
+}
+
+func TestInspectW3SuccessfulSSEPreservesResponse(t *testing.T) {
+	t.Parallel()
+
+	body := "data: {\"id\":\"chatcmpl-1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n" +
+		"data: [DONE]\n\n"
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       ioNopCloser(body),
+	}
+
+	got, err := inspectW3EmbeddedErrorResponse(resp)
+	if err != nil {
+		t.Fatalf("inspectW3EmbeddedErrorResponse returned error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("successful SSE detected as error: %v", got)
+	}
+
+	replayed, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		t.Fatalf("read replayed SSE body: %v", readErr)
+	}
+	if string(replayed) != body {
+		t.Fatalf("replayed SSE body = %q, want %q", string(replayed), body)
+	}
+}
+
+func TestValidateW3EmbeddedErrorClosesBodyBeforeWritingResponse(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	body := &trackingReadCloser{Reader: strings.NewReader(`{"error_code":"InferHub.002002010.429","error_msg":"quota exceeded"}`)}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       body,
+	}
+
+	gotResp, err := validateW3Response(c, &relaycommon.RelayInfo{}, resp)
+	if gotResp != nil {
+		t.Fatalf("response = %#v, want nil", gotResp)
+	}
+	var apiErr *types.NewAPIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("error type = %T, want *types.NewAPIError", err)
+	}
+	if apiErr.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status code = %d, want %d", apiErr.StatusCode, http.StatusTooManyRequests)
+	}
+	if !body.closed {
+		t.Fatal("upstream response body was not closed")
+	}
+	if c.Writer.Written() {
+		t.Fatal("embedded error wrote downstream response before retry handling")
+	}
+}
+
 func TestConvertImageRequest(t *testing.T) {
 	t.Parallel()
 
@@ -558,6 +691,16 @@ func (n nopReadCloser) Close() error {
 
 func ioNopCloser(body string) nopReadCloser {
 	return nopReadCloser{Reader: strings.NewReader(body)}
+}
+
+type trackingReadCloser struct {
+	*strings.Reader
+	closed bool
+}
+
+func (r *trackingReadCloser) Close() error {
+	r.closed = true
+	return nil
 }
 
 func uintPtr(v uint) *uint {
