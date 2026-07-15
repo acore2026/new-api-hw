@@ -228,10 +228,29 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 		relayInfo.LastError = newAPIError
+		willRetry := shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
+		retryDelayMs := 0
+		if willRetry {
+			retryDelayMs = service.GetRetryDelayMilliseconds()
+		}
+		if willRetry || service.HasRetryTrace(c) {
+			service.RecordRetryTrace(c, service.RetryTraceEntry{
+				ChannelID:   channel.Id,
+				ChannelName: channel.Name,
+				StatusCode:  newAPIError.StatusCode,
+				ErrorCode:   string(newAPIError.GetErrorCode()),
+				Error:       newAPIError.Error(),
+				WillRetry:   willRetry,
+				DelayMs:     retryDelayMs,
+			})
+		}
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 
-		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
+		if !willRetry {
+			break
+		}
+		if !service.WaitRetryDelay(c, retryDelayMs) {
 			break
 		}
 	}
@@ -329,13 +348,13 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 	if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
 		return false
 	}
+	if retryTimes <= 0 {
+		return false
+	}
 	if types.IsChannelError(openaiErr) {
 		return true
 	}
 	if types.IsSkipRetryError(openaiErr) {
-		return false
-	}
-	if retryTimes <= 0 {
 		return false
 	}
 	if _, ok := c.Get("specific_channel_id"); ok {
@@ -390,6 +409,8 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			adminInfo["multi_key_index"] = common.GetContextKeyInt(c, constant.ContextKeyChannelMultiKeyIndex)
 		}
 		service.AppendChannelAffinityAdminInfo(c, adminInfo)
+		service.AttachRetryTrace(c, adminInfo)
+		service.AttachMessageTrace(c, adminInfo)
 		other["admin_info"] = adminInfo
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
 		if startTime.IsZero() {
@@ -552,15 +573,38 @@ func RelayTask(c *gin.Context) {
 		if taskErr == nil {
 			break
 		}
+		willRetry := shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry())
+		retryDelayMs := 0
+		if willRetry {
+			retryDelayMs = service.GetRetryDelayMilliseconds()
+		}
+		if willRetry || service.HasRetryTrace(c) {
+			service.RecordRetryTrace(c, service.RetryTraceEntry{
+				ChannelID:   channel.Id,
+				ChannelName: channel.Name,
+				StatusCode:  taskErr.StatusCode,
+				ErrorCode:   taskErr.Code,
+				Error:       taskErr.Message,
+				WillRetry:   willRetry,
+				DelayMs:     retryDelayMs,
+			})
+		}
 
 		if !taskErr.LocalError {
+			upstreamErr := taskErr.Error
+			if upstreamErr == nil {
+				upstreamErr = errors.New(taskErr.Message)
+			}
 			processChannelError(c,
 				*types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey,
 					common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()),
-				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
+				types.NewOpenAIError(upstreamErr, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
 		}
 
-		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
+		if !willRetry {
+			break
+		}
+		if !service.WaitRetryDelay(c, retryDelayMs) {
 			break
 		}
 	}

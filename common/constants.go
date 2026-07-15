@@ -150,7 +150,13 @@ var AutomaticEnableChannelEnabled = false
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 
+const (
+	MaxRetryTimes             = 100
+	MaxRetryDelayMilliseconds = 60_000
+)
+
 var RetryTimes = 0
+var RetryDelayMilliseconds = 0
 
 //var RootUserEmail = ""
 

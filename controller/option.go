@@ -42,6 +42,14 @@ func isPositiveOptionValue(value string) bool {
 	return err == nil && floatValue > 0
 }
 
+func validateBoundedIntegerOption(value string, minimum int, maximum int) error {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || parsed < minimum || parsed > maximum {
+		return fmt.Errorf("value must be an integer between %d and %d", minimum, maximum)
+	}
+	return nil
+}
+
 func collectModelNamesFromOptionValue(raw string, modelNames map[string]struct{}) {
 	if strings.TrimSpace(raw) == "" {
 		return
@@ -150,6 +158,16 @@ func UpdateOption(c *gin.Context) {
 		}
 	}
 	switch option.Key {
+	case "RetryTimes":
+		if err := validateBoundedIntegerOption(option.Value.(string), 0, common.MaxRetryTimes); err != nil {
+			common.ApiErrorMsg(c, "RetryTimes "+err.Error())
+			return
+		}
+	case "RetryDelayMilliseconds":
+		if err := validateBoundedIntegerOption(option.Value.(string), 0, common.MaxRetryDelayMilliseconds); err != nil {
+			common.ApiErrorMsg(c, "RetryDelayMilliseconds "+err.Error())
+			return
+		}
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {
 			c.JSON(http.StatusOK, gin.H{

@@ -50,6 +50,12 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = info.UpstreamModelName
 	}
+	adminInfo := make(map[string]interface{})
+	adminInfo["use_channel"] = c.GetStringSlice("use_channel")
+	AppendChannelAffinityAdminInfo(c, adminInfo)
+	AttachRetryTrace(c, adminInfo)
+	AttachMessageTrace(c, adminInfo)
+	other["admin_info"] = adminInfo
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 		ChannelId: info.ChannelId,
 		ModelName: info.OriginModelName,

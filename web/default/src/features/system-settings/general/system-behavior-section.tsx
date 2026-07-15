@@ -43,7 +43,8 @@ import { useUpdateOption } from '../hooks/use-update-option'
 import { safeNumberFieldProps } from '../utils/numeric-field'
 
 const behaviorSchema = z.object({
-  RetryTimes: z.coerce.number().min(0).max(10),
+  RetryTimes: z.coerce.number().int().min(0).max(100),
+  RetryDelayMilliseconds: z.coerce.number().int().min(0).max(60000),
   DefaultCollapseSidebar: z.boolean(),
   DemoSiteEnabled: z.boolean(),
   SelfUseModeEnabled: z.boolean(),
@@ -96,12 +97,36 @@ export function SystemBehaviorSection({
                   <Input
                     type='number'
                     min='0'
-                    max='10'
+                    max='100'
+                    step='1'
                     {...safeNumberFieldProps(field)}
                   />
                 </FormControl>
                 <FormDescription>
-                  {t('Number of times to retry failed requests (0-10)')}
+                  {t('Number of times to retry failed requests (0-100)')}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='RetryDelayMilliseconds'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Retry Delay (ms)')}</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min='0'
+                    max='60000'
+                    step='1'
+                    {...safeNumberFieldProps(field)}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t('Fixed delay before each retry (0-60000 ms)')}
                 </FormDescription>
                 <FormMessage />
               </FormItem>

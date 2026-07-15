@@ -2669,7 +2669,7 @@
     "Number of completions to generate": "生成する候補数",
     "Number of images to generate": "生成する画像枚数",
     "Number of keys to create": "作成するキーの数",
-    "Number of times to retry failed requests (0-10)": "失敗したリクエストを再試行する回数 (0-10)",
+    "Number of times to retry failed requests (0-100)": "失敗したリクエストの再試行回数（0～100）",
     "Number of tokens per unit quota": "単位クォータあたりのトークン数",
     "Number of top log probabilities returned per token": "トークンごとに返される上位対数確率の数",
     "Number of users invited": "招待されたユーザー数",
@@ -4536,6 +4536,15 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
+    "Configured Retries": "設定済み再試行回数",
+    "Error Code": "エラーコード",
+    "Failed Attempt": "失敗した試行",
+    "Fixed delay before each retry (0-60000 ms)": "各再試行前の固定遅延（0～60000ミリ秒）",
+    "Retry Count": "再試行回数",
+    "Retry Delay (ms)": "再試行遅延（ミリ秒）",
+    "Retry Trace": "再試行トレース",
+    "Total Retry Delay": "再試行の合計遅延",
+    "Will Retry": "再試行する",
     "Zoom": "ズーム"
   }
 }

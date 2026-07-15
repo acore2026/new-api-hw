@@ -335,6 +335,11 @@ func AttachMessageTrace(ctx *gin.Context, adminInfo map[string]interface{}) {
 	if !ok || trace == nil {
 		return
 	}
+	if traceMap, ok := trace.(map[string]interface{}); ok {
+		if retryTrace := GetRetryTraceSnapshot(ctx); retryTrace != nil {
+			traceMap["retry_trace"] = retryTrace
+		}
+	}
 	adminInfo["message_trace"] = trace
 }
 

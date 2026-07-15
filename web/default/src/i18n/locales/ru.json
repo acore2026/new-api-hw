@@ -2669,7 +2669,7 @@
     "Number of completions to generate": "Число генерируемых вариантов",
     "Number of images to generate": "Количество изображений",
     "Number of keys to create": "Количество ключей для создания",
-    "Number of times to retry failed requests (0-10)": "Количество повторных попыток для неудачных запросов (0-10)",
+    "Number of times to retry failed requests (0-100)": "Количество повторов неудачных запросов (0–100)",
     "Number of tokens per unit quota": "Количество токенов на единицу квоты",
     "Number of top log probabilities returned per token": "Количество top-вероятностей на токен",
     "Number of users invited": "Количество приглашенных пользователей",
@@ -4536,6 +4536,15 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
+    "Configured Retries": "Настроено повторов",
+    "Error Code": "Код ошибки",
+    "Failed Attempt": "Неудачная попытка",
+    "Fixed delay before each retry (0-60000 ms)": "Фиксированная задержка перед каждым повтором (0–60000 мс)",
+    "Retry Count": "Количество повторов",
+    "Retry Delay (ms)": "Задержка повтора (мс)",
+    "Retry Trace": "Трассировка повторов",
+    "Total Retry Delay": "Общая задержка повторов",
+    "Will Retry": "Будет повтор",
     "Zoom": "Zoom"
   }
 }

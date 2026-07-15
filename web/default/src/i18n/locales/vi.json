@@ -2669,7 +2669,7 @@
     "Number of completions to generate": "Số lượng phản hồi cần sinh",
     "Number of images to generate": "Số ảnh cần sinh",
     "Number of keys to create": "Số lượng khóa cần tạo",
-    "Number of times to retry failed requests (0-10)": "Số lần thử lại các yêu cầu không thành công (0-10)",
+    "Number of times to retry failed requests (0-100)": "Số lần thử lại yêu cầu thất bại (0-100)",
     "Number of tokens per unit quota": "Số token trên đơn vị hạn mức",
     "Number of top log probabilities returned per token": "Số log probabilities hàng đầu trên mỗi token",
     "Number of users invited": "Số người dùng được mời",
@@ -4536,6 +4536,15 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
+    "Configured Retries": "Số lần thử lại đã cấu hình",
+    "Error Code": "Mã lỗi",
+    "Failed Attempt": "Lần thử thất bại",
+    "Fixed delay before each retry (0-60000 ms)": "Độ trễ cố định trước mỗi lần thử lại (0-60000 ms)",
+    "Retry Count": "Số lần thử lại",
+    "Retry Delay (ms)": "Độ trễ thử lại (ms)",
+    "Retry Trace": "Dấu vết thử lại",
+    "Total Retry Delay": "Tổng độ trễ thử lại",
+    "Will Retry": "Sẽ thử lại",
     "Zoom": "Zoom"
   }
 }

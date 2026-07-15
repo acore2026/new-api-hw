@@ -425,6 +425,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
     props.isAdmin && adminInfo?.message_trace?.body
       ? adminInfo.message_trace
       : null
+  const retryTrace = props.isAdmin
+    ? (adminInfo?.retry_trace ?? adminInfo?.message_trace?.retry_trace)
+    : undefined
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
       ? ([
@@ -657,6 +660,93 @@ export function DetailsDialog(props: DetailsDialogProps) {
                         {conversionLabel}
                       </span>
                     </div>
+                  </div>
+                </div>
+              </DetailSection>
+            )}
+
+            {/* Retry trace (admin only, available without full message capture) */}
+            {retryTrace && retryTrace.entries.length > 0 && (
+              <DetailSection
+                icon={<Route className='size-3.5' aria-hidden='true' />}
+                label={t('Retry Trace')}
+              >
+                <div className='flex flex-col gap-2'>
+                  <div className='flex flex-wrap gap-x-4 gap-y-1'>
+                    <DetailRow
+                      label={t('Retry Count')}
+                      value={retryTrace.retry_count}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('Configured Retries')}
+                      value={retryTrace.configured_retries}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('Retry Delay (ms)')}
+                      value={`${retryTrace.configured_delay_ms} ms`}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('Total Retry Delay')}
+                      value={`${retryTrace.total_delay_ms} ms`}
+                      mono
+                    />
+                  </div>
+                  <div className='flex flex-col gap-1.5'>
+                    {retryTrace.entries.map((entry) => {
+                      const channel = entry.channel_name
+                        ? `${entry.channel_id ?? '-'} (${entry.channel_name})`
+                        : entry.channel_id
+                      return (
+                        <div
+                          key={entry.attempt}
+                          className='bg-background/50 flex flex-col gap-1.5 rounded border p-2'
+                        >
+                          <p className='text-xs font-medium'>
+                            {t('Failed Attempt')} #{entry.attempt}
+                          </p>
+                          <div className='flex flex-wrap gap-x-4 gap-y-1'>
+                            {channel != null && (
+                              <DetailRow
+                                label={t('Channel')}
+                                value={channel}
+                                mono
+                              />
+                            )}
+                            {entry.status_code != null && (
+                              <DetailRow
+                                label={t('Status')}
+                                value={entry.status_code}
+                                mono
+                              />
+                            )}
+                            {entry.error_code && (
+                              <DetailRow
+                                label={t('Error Code')}
+                                value={entry.error_code}
+                                mono
+                              />
+                            )}
+                            <DetailRow
+                              label={t('Will Retry')}
+                              value={t(entry.will_retry ? 'Yes' : 'No')}
+                            />
+                            {entry.delay_ms > 0 && (
+                              <DetailRow
+                                label={t('Retry Delay (ms)')}
+                                value={`${entry.delay_ms} ms`}
+                                mono
+                              />
+                            )}
+                          </div>
+                          {entry.error && (
+                            <DetailRow label={t('Error')} value={entry.error} />
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </DetailSection>

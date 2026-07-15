@@ -92,6 +92,25 @@ export interface ChannelAffinityInfo {
   using_group?: string
 }
 
+export interface RetryTraceEntry {
+  attempt: number
+  channel_id?: number
+  channel_name?: string
+  status_code?: number
+  error_code?: string
+  error?: string
+  will_retry: boolean
+  delay_ms: number
+}
+
+export interface RetryTraceInfo {
+  configured_retries: number
+  configured_delay_ms: number
+  retry_count: number
+  total_delay_ms: number
+  entries: RetryTraceEntry[]
+}
+
 export interface LogOtherData {
   admin_info?: {
     is_multi_key?: boolean
@@ -109,6 +128,7 @@ export interface LogOtherData {
     // Manage audit fields (type=3, admin only)
     admin_username?: string
     admin_id?: number | string
+    retry_trace?: RetryTraceInfo
     message_trace?: {
       captured_at?: number
       expires_at?: number
@@ -128,6 +148,7 @@ export interface LogOtherData {
       max_bytes?: number
       truncated?: boolean
       redaction_note?: string
+      retry_trace?: RetryTraceInfo
     }
   }
   request_path?: string

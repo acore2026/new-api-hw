@@ -2669,7 +2669,7 @@
     "Number of completions to generate": "Number of completions to generate",
     "Number of images to generate": "Number of images to generate",
     "Number of keys to create": "Number of keys to create",
-    "Number of times to retry failed requests (0-10)": "Number of times to retry failed requests (0-10)",
+    "Number of times to retry failed requests (0-100)": "Number of times to retry failed requests (0-100)",
     "Number of tokens per unit quota": "Number of tokens per unit quota",
     "Number of top log probabilities returned per token": "Number of top log probabilities returned per token",
     "Number of users invited": "Number of users invited",
@@ -4536,6 +4536,15 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
+    "Configured Retries": "Configured Retries",
+    "Error Code": "Error Code",
+    "Failed Attempt": "Failed Attempt",
+    "Fixed delay before each retry (0-60000 ms)": "Fixed delay before each retry (0-60000 ms)",
+    "Retry Count": "Retry Count",
+    "Retry Delay (ms)": "Retry Delay (ms)",
+    "Retry Trace": "Retry Trace",
+    "Total Retry Delay": "Total Retry Delay",
+    "Will Retry": "Will Retry",
     "Zoom": "Zoom"
   }
 }
