@@ -431,6 +431,8 @@
     "从配置文件同步": "Sync from config file",
     "从默认列表中去掉一个分组": "Remove a group from the default list",
     "代理地址": "Proxy address",
+    "关闭此渠道所有请求的 TLS 证书验证。仅用于可信的内部端点。": "Disable TLS certificate verification for all requests made by this channel. Use only for trusted internal endpoints.",
+    "忽略 SSL 证书验证": "Ignore SSL certificate verification",
     "代理设置": "Proxy Settings",
     "代码已复制到剪贴板": "Code copied to clipboard",
     "令牌": "Tokens",

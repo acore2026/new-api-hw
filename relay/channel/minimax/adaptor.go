@@ -535,6 +535,9 @@ func doW3RequestOnce(a *Adaptor, c *gin.Context, info *relaycommon.RelayInfo, re
 	}
 
 	config := service.ResolveW3OAuthConfig(info.ChannelOtherSettings)
+	if info.ChannelSetting.TLSInsecureSkipVerify {
+		config.VerifyTLS = false
+	}
 	requestTimeout := time.Duration(0)
 	if info.IsStream {
 		requestTimeout = -1

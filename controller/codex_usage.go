@@ -59,7 +59,8 @@ func GetCodexChannelUsage(c *gin.Context) {
 		return
 	}
 
-	client, err := service.NewProxyHttpClient(ch.GetSetting().Proxy)
+	channelSetting := ch.GetSetting()
+	client, err := service.GetHttpClientWithOptions(channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -79,7 +80,7 @@ func GetCodexChannelUsage(c *gin.Context) {
 		refreshCtx, refreshCancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 		defer refreshCancel()
 
-		res, refreshErr := service.RefreshCodexOAuthTokenWithProxy(refreshCtx, oauthKey.RefreshToken, ch.GetSetting().Proxy)
+		res, refreshErr := service.RefreshCodexOAuthTokenWithOptions(refreshCtx, oauthKey.RefreshToken, channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
 		if refreshErr == nil {
 			oauthKey.AccessToken = res.AccessToken
 			oauthKey.RefreshToken = res.RefreshToken

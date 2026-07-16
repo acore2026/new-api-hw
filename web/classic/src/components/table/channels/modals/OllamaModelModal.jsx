@@ -223,10 +223,14 @@ const OllamaModelModal = ({
     try {
       if (shouldTryLiveFetch && resolvedBaseUrl) {
         try {
+          const channelSetting = parseMaybeJSON(channelInfo?.setting) || {};
           const payload = {
             base_url: resolvedBaseUrl,
             type: CHANNEL_TYPE_OLLAMA,
             key: channelInfo?.key || '',
+            proxy: channelSetting.proxy || '',
+            tls_insecure_skip_verify:
+              channelSetting.tls_insecure_skip_verify === true,
           };
 
           const res = await API.post('/api/channel/fetch_models', payload, {

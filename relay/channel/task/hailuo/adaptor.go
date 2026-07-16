@@ -28,12 +28,14 @@ type TaskAdaptor struct {
 	ChannelType int
 	apiKey      string
 	baseURL     string
+	setting     dto.ChannelSettings
 }
 
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.ChannelType = info.ChannelType
 	a.baseURL = info.ChannelBaseUrl
 	a.apiKey = info.ApiKey
+	a.setting = info.ChannelSetting
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.TaskError) {
@@ -111,7 +113,7 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	return hResp.TaskID, responseBody, nil
 }
 
-func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
+func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, channelSetting dto.ChannelSettings) (*http.Response, error) {
 	taskID, ok := body["task_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("invalid task_id")
@@ -127,7 +129,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+key)
 
-	client, err := service.GetHttpClientWithProxy(proxy)
+	client, err := service.GetHttpClientWithOptions(channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
 	if err != nil {
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)
 	}
@@ -260,7 +262,11 @@ func (a *TaskAdaptor) buildVideoURL(_, fileID string) string {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+a.apiKey)
 
-	resp, err := service.GetHttpClient().Do(req)
+	client, err := service.GetHttpClientWithOptions(a.setting.Proxy, a.setting.TLSInsecureSkipVerify)
+	if err != nil {
+		return ""
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return ""
 	}

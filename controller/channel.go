@@ -1010,9 +1010,11 @@ func UpdateChannel(c *gin.Context) {
 
 func FetchModels(c *gin.Context) {
 	var req struct {
-		BaseURL string `json:"base_url"`
-		Type    int    `json:"type"`
-		Key     string `json:"key"`
+		BaseURL               string `json:"base_url"`
+		Type                  int    `json:"type"`
+		Key                   string `json:"key"`
+		Proxy                 string `json:"proxy"`
+		TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1031,9 +1033,13 @@ func FetchModels(c *gin.Context) {
 	// remove line breaks and extra spaces.
 	key := strings.TrimSpace(req.Key)
 	key = strings.Split(key, "\n")[0]
+	channelSetting := dto.ChannelSettings{
+		Proxy:                 req.Proxy,
+		TLSInsecureSkipVerify: req.TLSInsecureSkipVerify,
+	}
 
 	if req.Type == constant.ChannelTypeOllama {
-		models, err := ollama.FetchOllamaModels(baseURL, key)
+		models, err := ollama.FetchOllamaModels(baseURL, key, channelSetting)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -1055,7 +1061,7 @@ func FetchModels(c *gin.Context) {
 	}
 
 	if req.Type == constant.ChannelTypeGemini {
-		models, err := gemini.FetchGeminiModels(baseURL, key, "")
+		models, err := gemini.FetchGeminiModels(baseURL, key, channelSetting)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -1071,7 +1077,14 @@ func FetchModels(c *gin.Context) {
 		return
 	}
 
-	client := &http.Client{}
+	client, err := service.GetHttpClientWithOptions(channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
 	url := fmt.Sprintf("%s/v1/models", baseURL)
 
 	request, err := http.NewRequest("GET", url, nil)
@@ -1783,7 +1796,7 @@ func OllamaPullModel(c *gin.Context) {
 	}
 
 	key := strings.Split(channel.Key, "\n")[0]
-	err = ollama.PullOllamaModel(baseURL, key, req.ModelName)
+	err = ollama.PullOllamaModel(baseURL, key, req.ModelName, channel.GetSetting())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -1861,7 +1874,7 @@ func OllamaPullModelStream(c *gin.Context) {
 	}
 
 	// 执行拉取
-	err = ollama.PullOllamaModelStream(baseURL, key, req.ModelName, progressCallback)
+	err = ollama.PullOllamaModelStream(baseURL, key, req.ModelName, channel.GetSetting(), progressCallback)
 
 	if err != nil {
 		errorData, _ := json.Marshal(gin.H{
@@ -1928,7 +1941,7 @@ func OllamaDeleteModel(c *gin.Context) {
 	}
 
 	key := strings.Split(channel.Key, "\n")[0]
-	err = ollama.DeleteOllamaModel(baseURL, key, req.ModelName)
+	err = ollama.DeleteOllamaModel(baseURL, key, req.ModelName, channel.GetSetting())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -1977,7 +1990,7 @@ func OllamaVersion(c *gin.Context) {
 	}
 
 	key := strings.Split(channel.Key, "\n")[0]
-	version, err := ollama.FetchOllamaVersion(baseURL, key)
+	version, err := ollama.FetchOllamaVersion(baseURL, key, channel.GetSetting())
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

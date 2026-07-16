@@ -238,6 +238,7 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.priority ||
     values.weight ||
     values.proxy?.trim() ||
+    values.tls_insecure_skip_verify ||
     values.system_prompt?.trim() ||
     values.force_format ||
     values.thinking_to_content ||
@@ -773,30 +774,29 @@ export function ChannelMutateDrawer({
     }
   }, [channelId, queryClient, t])
 
-  const getW3OAuthSettingsPayload =
-    useCallback((): W3OAuthSettingsPayload => {
-      const apiBaseUrl =
-        form.getValues('w3_api_base_url') || W3_DEFAULTS.apiBaseUrl
-      return {
-        proxy: form.getValues('proxy')?.trim() || undefined,
-        w3_provider_id:
-          form.getValues('w3_provider_id') || W3_DEFAULTS.providerId,
-        w3_verify_tls: form.getValues('w3_verify_tls') === true,
-        w3_api_base_url: apiBaseUrl,
-        w3_auth_url: form.getValues('w3_auth_url') || W3_DEFAULTS.authUrl,
-        w3_token_url:
-          form.getValues('w3_token_url') || `${apiBaseUrl}/oauth/getToken`,
-        w3_refresh_url:
-          form.getValues('w3_refresh_url') ||
-          `${apiBaseUrl}/oauth/refreshToken`,
-        w3_client_id:
-          form.getValues('w3_client_id') || W3_DEFAULTS.clientId,
-        w3_callback_url_base:
-          form.getValues('w3_callback_url_base') ||
-          `${apiBaseUrl}/oauth/callback`,
-        w3_scope: form.getValues('w3_scope') || W3_DEFAULTS.scope,
-      }
-    }, [form])
+  const getW3OAuthSettingsPayload = useCallback((): W3OAuthSettingsPayload => {
+    const apiBaseUrl =
+      form.getValues('w3_api_base_url') || W3_DEFAULTS.apiBaseUrl
+    return {
+      proxy: form.getValues('proxy')?.trim() || undefined,
+      tls_insecure_skip_verify:
+        form.getValues('tls_insecure_skip_verify') === true,
+      w3_provider_id:
+        form.getValues('w3_provider_id') || W3_DEFAULTS.providerId,
+      w3_verify_tls: form.getValues('w3_verify_tls') === true,
+      w3_api_base_url: apiBaseUrl,
+      w3_auth_url: form.getValues('w3_auth_url') || W3_DEFAULTS.authUrl,
+      w3_token_url:
+        form.getValues('w3_token_url') || `${apiBaseUrl}/oauth/getToken`,
+      w3_refresh_url:
+        form.getValues('w3_refresh_url') || `${apiBaseUrl}/oauth/refreshToken`,
+      w3_client_id: form.getValues('w3_client_id') || W3_DEFAULTS.clientId,
+      w3_callback_url_base:
+        form.getValues('w3_callback_url_base') ||
+        `${apiBaseUrl}/oauth/callback`,
+      w3_scope: form.getValues('w3_scope') || W3_DEFAULTS.scope,
+    }
+  }, [form])
 
   // Unified function to update models
   const updateModels = useCallback(
@@ -838,6 +838,9 @@ export function ChannelMutateDrawer({
         type,
         key,
         base_url: form.getValues('base_url') || '',
+        proxy: form.getValues('proxy') || '',
+        tls_insecure_skip_verify:
+          form.getValues('tls_insecure_skip_verify') === true,
       })
 
       if (response.success && response.data) {
@@ -3491,6 +3494,31 @@ export function ChannelMutateDrawer({
                             )}
                           </FormDescription>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='tls_insecure_skip_verify'
+                      render={({ field }) => (
+                        <FormItem className='flex items-center justify-between gap-3 rounded-lg border px-4 py-3'>
+                          <div className='flex flex-col gap-0.5'>
+                            <FormLabel>
+                              {t('Ignore SSL certificate verification')}
+                            </FormLabel>
+                            <FormDescription>
+                              {t(
+                                'Disable TLS certificate verification for all requests made by this channel. Use only for trusted internal endpoints.'
+                              )}
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />

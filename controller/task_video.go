@@ -53,6 +53,7 @@ func updateVideoTaskAll(ctx context.Context, platform constant.TaskPlatform, cha
 		ChannelBaseUrl: cacheGetChannel.GetBaseURL(),
 	}
 	info.ApiKey = cacheGetChannel.Key
+	info.ChannelSetting = cacheGetChannel.GetSetting()
 	adaptor.Init(info)
 	for _, taskId := range taskIds {
 		if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, taskId, taskM); err != nil {
@@ -67,7 +68,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 	if channel.GetBaseURL() != "" {
 		baseURL = channel.GetBaseURL()
 	}
-	proxy := channel.GetSetting().Proxy
+	channelSetting := channel.GetSetting()
 
 	task := taskM[taskId]
 	if task == nil {
@@ -83,7 +84,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 	resp, err := adaptor.FetchTask(baseURL, key, map[string]any{
 		"task_id": taskId,
 		"action":  task.Action,
-	}, proxy)
+	}, channelSetting)
 	if err != nil {
 		return fmt.Errorf("fetchTask failed for task %s: %w", taskId, err)
 	}

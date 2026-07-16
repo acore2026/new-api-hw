@@ -68,7 +68,11 @@ func RefreshW3ChannelCredential(ctx context.Context, channelID int, opts W3Crede
 	defer cancel()
 
 	config := ResolveW3OAuthConfig(settings)
-	res, err := RefreshW3OAuthToken(refreshCtx, config, ch.GetSetting().Proxy, oauthKey.RefreshToken)
+	channelSetting := ch.GetSetting()
+	if channelSetting.TLSInsecureSkipVerify {
+		config.VerifyTLS = false
+	}
+	res, err := RefreshW3OAuthToken(refreshCtx, config, channelSetting.Proxy, oauthKey.RefreshToken)
 	if err != nil {
 		return nil, nil, err
 	}

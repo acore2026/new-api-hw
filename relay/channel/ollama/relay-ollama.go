@@ -2,7 +2,6 @@ package ollama
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,7 +31,7 @@ func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*Ollam
 		} else if r.ResponseFormat.Type == "json_schema" {
 			if len(r.ResponseFormat.JsonSchema) > 0 {
 				var schema any
-				_ = json.Unmarshal(r.ResponseFormat.JsonSchema, &schema)
+				_ = common.Unmarshal(r.ResponseFormat.JsonSchema, &schema)
 				chatReq.Format = schema
 			}
 		}
@@ -127,7 +126,7 @@ func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*Ollam
 				for _, tc := range parsed {
 					var args interface{}
 					if tc.Function.Arguments != "" {
-						_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+						_ = common.Unmarshal([]byte(tc.Function.Arguments), &args)
 					}
 					if args == nil {
 						args = map[string]any{}
@@ -180,7 +179,7 @@ func openAIToGenerate(c *gin.Context, r *dto.GeneralOpenAIRequest) (*OllamaGener
 			gen.Format = "json"
 		} else if r.ResponseFormat.Type == "json_schema" {
 			var schema any
-			_ = json.Unmarshal(r.ResponseFormat.JsonSchema, &schema)
+			_ = common.Unmarshal(r.ResponseFormat.JsonSchema, &schema)
 			gen.Format = schema
 		}
 	}
@@ -278,10 +277,13 @@ func ollamaEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	return usage, nil
 }
 
-func FetchOllamaModels(baseURL, apiKey string) ([]OllamaModel, error) {
+func FetchOllamaModels(baseURL, apiKey string, channelSetting dto.ChannelSettings) ([]OllamaModel, error) {
 	url := fmt.Sprintf("%s/api/tags", baseURL)
 
-	client := &http.Client{}
+	client, err := service.GetHttpClientWithOptions(channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
+	if err != nil {
+		return nil, fmt.Errorf("创建HTTP客户端失败: %v", err)
+	}
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败: %v", err)
@@ -318,7 +320,7 @@ func FetchOllamaModels(baseURL, apiKey string) ([]OllamaModel, error) {
 }
 
 // 拉取 Ollama 模型 (非流式)
-func PullOllamaModel(baseURL, apiKey, modelName string) error {
+func PullOllamaModel(baseURL, apiKey, modelName string, channelSetting dto.ChannelSettings) error {
 	url := fmt.Sprintf("%s/api/pull", baseURL)
 
 	pullRequest := OllamaPullRequest{
@@ -331,8 +333,9 @@ func PullOllamaModel(baseURL, apiKey, modelName string) error {
 		return fmt.Errorf("序列化请求失败: %v", err)
 	}
 
-	client := &http.Client{
-		Timeout: 30 * 60 * 1000 * time.Millisecond, // 30分钟超时，支持大模型
+	client, err := newOllamaHTTPClient(channelSetting, 30*time.Minute)
+	if err != nil {
+		return fmt.Errorf("创建HTTP客户端失败: %v", err)
 	}
 	request, err := http.NewRequest("POST", url, strings.NewReader(string(requestBody)))
 	if err != nil {
@@ -359,7 +362,7 @@ func PullOllamaModel(baseURL, apiKey, modelName string) error {
 }
 
 // 流式拉取 Ollama 模型 (支持进度回调)
-func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback func(OllamaPullResponse)) error {
+func PullOllamaModelStream(baseURL, apiKey, modelName string, channelSetting dto.ChannelSettings, progressCallback func(OllamaPullResponse)) error {
 	url := fmt.Sprintf("%s/api/pull", baseURL)
 
 	pullRequest := OllamaPullRequest{
@@ -372,8 +375,9 @@ func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback f
 		return fmt.Errorf("序列化请求失败: %v", err)
 	}
 
-	client := &http.Client{
-		Timeout: 60 * 60 * 1000 * time.Millisecond, // 1小时超时，支持超大模型
+	client, err := newOllamaHTTPClient(channelSetting, time.Hour)
+	if err != nil {
+		return fmt.Errorf("创建HTTP客户端失败: %v", err)
 	}
 	request, err := http.NewRequest("POST", url, strings.NewReader(string(requestBody)))
 	if err != nil {
@@ -436,7 +440,7 @@ func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback f
 }
 
 // 删除 Ollama 模型
-func DeleteOllamaModel(baseURL, apiKey, modelName string) error {
+func DeleteOllamaModel(baseURL, apiKey, modelName string, channelSetting dto.ChannelSettings) error {
 	url := fmt.Sprintf("%s/api/delete", baseURL)
 
 	deleteRequest := OllamaDeleteRequest{
@@ -448,7 +452,10 @@ func DeleteOllamaModel(baseURL, apiKey, modelName string) error {
 		return fmt.Errorf("序列化请求失败: %v", err)
 	}
 
-	client := &http.Client{}
+	client, err := newOllamaHTTPClient(channelSetting, 0)
+	if err != nil {
+		return fmt.Errorf("创建HTTP客户端失败: %v", err)
+	}
 	request, err := http.NewRequest("DELETE", url, strings.NewReader(string(requestBody)))
 	if err != nil {
 		return fmt.Errorf("创建请求失败: %v", err)
@@ -473,7 +480,7 @@ func DeleteOllamaModel(baseURL, apiKey, modelName string) error {
 	return nil
 }
 
-func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
+func FetchOllamaVersion(baseURL, apiKey string, channelSetting dto.ChannelSettings) (string, error) {
 	trimmedBase := strings.TrimRight(baseURL, "/")
 	if trimmedBase == "" {
 		return "", fmt.Errorf("baseURL 为空")
@@ -481,7 +488,10 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 
 	url := fmt.Sprintf("%s/api/version", trimmedBase)
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client, err := newOllamaHTTPClient(channelSetting, 10*time.Second)
+	if err != nil {
+		return "", fmt.Errorf("创建HTTP客户端失败: %v", err)
+	}
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("创建请求失败: %v", err)
@@ -510,7 +520,7 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 		Version string `json:"version"`
 	}
 
-	if err := json.Unmarshal(body, &versionResp); err != nil {
+	if err := common.Unmarshal(body, &versionResp); err != nil {
 		return "", fmt.Errorf("解析响应失败: %v", err)
 	}
 
@@ -519,4 +529,14 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 	}
 
 	return versionResp.Version, nil
+}
+
+func newOllamaHTTPClient(channelSetting dto.ChannelSettings, timeout time.Duration) (*http.Client, error) {
+	baseClient, err := service.GetHttpClientWithOptions(channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify)
+	if err != nil {
+		return nil, err
+	}
+	client := *baseClient
+	client.Timeout = timeout
+	return &client, nil
 }

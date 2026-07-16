@@ -22,16 +22,17 @@ import (
 )
 
 type w3OAuthStartRequest struct {
-	Proxy             string `json:"proxy"`
-	W3ProviderID      string `json:"w3_provider_id"`
-	W3VerifyTLS       bool   `json:"w3_verify_tls"`
-	W3ApiBaseURL      string `json:"w3_api_base_url"`
-	W3AuthURL         string `json:"w3_auth_url"`
-	W3TokenURL        string `json:"w3_token_url"`
-	W3RefreshURL      string `json:"w3_refresh_url"`
-	W3ClientID        string `json:"w3_client_id"`
-	W3CallbackURLBase string `json:"w3_callback_url_base"`
-	W3Scope           string `json:"w3_scope"`
+	Proxy                 string `json:"proxy"`
+	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify"`
+	W3ProviderID          string `json:"w3_provider_id"`
+	W3VerifyTLS           bool   `json:"w3_verify_tls"`
+	W3ApiBaseURL          string `json:"w3_api_base_url"`
+	W3AuthURL             string `json:"w3_auth_url"`
+	W3TokenURL            string `json:"w3_token_url"`
+	W3RefreshURL          string `json:"w3_refresh_url"`
+	W3ClientID            string `json:"w3_client_id"`
+	W3CallbackURLBase     string `json:"w3_callback_url_base"`
+	W3Scope               string `json:"w3_scope"`
 }
 
 func w3OAuthSessionKey(channelID int, field string) string {
@@ -60,13 +61,16 @@ func StartW3OAuthForChannel(c *gin.Context) {
 }
 
 func startW3OAuthWithChannelID(c *gin.Context, channelID int) {
-	settings, proxy, err := resolveW3OAuthStartSettings(c, channelID)
+	settings, proxy, tlsInsecureSkipVerify, err := resolveW3OAuthStartSettings(c, channelID)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
 		return
 	}
 
 	config := service.ResolveW3OAuthConfig(settings)
+	if tlsInsecureSkipVerify {
+		config.VerifyTLS = false
+	}
 	flow, err := service.CreateW3OAuthAuthorizationFlow(config)
 	if err != nil {
 		common.ApiError(c, err)
@@ -234,29 +238,30 @@ func RefreshW3ChannelCredential(c *gin.Context) {
 	})
 }
 
-func resolveW3OAuthStartSettings(c *gin.Context, channelID int) (dto.ChannelOtherSettings, string, error) {
+func resolveW3OAuthStartSettings(c *gin.Context, channelID int) (dto.ChannelOtherSettings, string, bool, error) {
 	if channelID > 0 {
 		ch, err := model.GetChannelById(channelID, false)
 		if err != nil {
-			return dto.ChannelOtherSettings{}, "", err
+			return dto.ChannelOtherSettings{}, "", false, err
 		}
 		if ch == nil {
-			return dto.ChannelOtherSettings{}, "", errors.New("channel not found")
+			return dto.ChannelOtherSettings{}, "", false, errors.New("channel not found")
 		}
 		if ch.Type != constant.ChannelTypeMiniMax {
-			return dto.ChannelOtherSettings{}, "", errors.New("channel type is not MiniMax")
+			return dto.ChannelOtherSettings{}, "", false, errors.New("channel type is not MiniMax")
 		}
 		settings := ch.GetOtherSettings()
 		if !settings.W3OAuthEnabled {
-			return dto.ChannelOtherSettings{}, "", errors.New("channel W3 OAuth is not enabled")
+			return dto.ChannelOtherSettings{}, "", false, errors.New("channel W3 OAuth is not enabled")
 		}
-		return settings, ch.GetSetting().Proxy, nil
+		channelSetting := ch.GetSetting()
+		return settings, channelSetting.Proxy, channelSetting.TLSInsecureSkipVerify, nil
 	}
 
 	var req w3OAuthStartRequest
 	if c.Request != nil && c.Request.Body != nil && c.Request.ContentLength != 0 {
 		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-			return dto.ChannelOtherSettings{}, "", err
+			return dto.ChannelOtherSettings{}, "", false, err
 		}
 	}
 	settings := dto.ChannelOtherSettings{
@@ -271,7 +276,7 @@ func resolveW3OAuthStartSettings(c *gin.Context, channelID int) (dto.ChannelOthe
 		W3CallbackURLBase: req.W3CallbackURLBase,
 		W3Scope:           req.W3Scope,
 	}
-	return settings, strings.TrimSpace(req.Proxy), nil
+	return settings, strings.TrimSpace(req.Proxy), req.TLSInsecureSkipVerify, nil
 }
 
 func validateSavedW3Channel(channelID int) error {

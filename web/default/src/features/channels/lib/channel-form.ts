@@ -67,6 +67,7 @@ export const channelFormSchema = z.object({
   force_format: z.boolean().optional(),
   thinking_to_content: z.boolean().optional(),
   proxy: z.string().optional(),
+  tls_insecure_skip_verify: z.boolean().optional(),
   pass_through_body_enabled: z.boolean().optional(),
   system_prompt: z.string().optional(),
   system_prompt_override: z.boolean().optional(),
@@ -135,6 +136,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   force_format: false,
   thinking_to_content: false,
   proxy: '',
+  tls_insecure_skip_verify: false,
   pass_through_body_enabled: false,
   system_prompt: '',
   system_prompt_override: false,
@@ -181,6 +183,7 @@ export function transformChannelToFormDefaults(
     force_format: false,
     thinking_to_content: false,
     proxy: '',
+    tls_insecure_skip_verify: false,
     pass_through_body_enabled: false,
     system_prompt: '',
     system_prompt_override: false,
@@ -193,6 +196,7 @@ export function transformChannelToFormDefaults(
         force_format: parsed.force_format || false,
         thinking_to_content: parsed.thinking_to_content || false,
         proxy: parsed.proxy || '',
+        tls_insecure_skip_verify: parsed.tls_insecure_skip_verify === true,
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
         system_prompt: parsed.system_prompt || '',
         system_prompt_override: parsed.system_prompt_override || false,
@@ -241,8 +245,7 @@ export function transformChannelToFormDefaults(
       w3VerifyTls = parsed.w3_verify_tls === true
       w3ApiBaseUrl = parsed.w3_api_base_url || W3_DEFAULTS.apiBaseUrl
       w3AuthUrl = parsed.w3_auth_url || W3_DEFAULTS.authUrl
-      w3TokenUrl =
-        parsed.w3_token_url || `${w3ApiBaseUrl}/oauth/getToken`
+      w3TokenUrl = parsed.w3_token_url || `${w3ApiBaseUrl}/oauth/getToken`
       w3RefreshUrl =
         parsed.w3_refresh_url || `${w3ApiBaseUrl}/oauth/refreshToken`
       w3ClientId = parsed.w3_client_id || W3_DEFAULTS.clientId
@@ -335,6 +338,7 @@ function buildSettingJSON(formData: ChannelFormValues): string {
     force_format: formData.force_format || false,
     thinking_to_content: formData.thinking_to_content || false,
     proxy: formData.proxy || '',
+    tls_insecure_skip_verify: formData.tls_insecure_skip_verify === true,
     pass_through_body_enabled: formData.pass_through_body_enabled || false,
     system_prompt: formData.system_prompt || '',
     system_prompt_override: formData.system_prompt_override || false,
@@ -408,8 +412,7 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
       formData.w3_api_base_url || W3_DEFAULTS.apiBaseUrl
     settingsObj.w3_auth_url = formData.w3_auth_url || W3_DEFAULTS.authUrl
     settingsObj.w3_token_url =
-      formData.w3_token_url ||
-      `${settingsObj.w3_api_base_url}/oauth/getToken`
+      formData.w3_token_url || `${settingsObj.w3_api_base_url}/oauth/getToken`
     settingsObj.w3_refresh_url =
       formData.w3_refresh_url ||
       `${settingsObj.w3_api_base_url}/oauth/refreshToken`

@@ -389,7 +389,14 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		targetHeader.Set(key, value)
 	}
 	targetHeader.Set("Content-Type", c.Request.Header.Get("Content-Type"))
-	targetConn, _, err := websocket.DefaultDialer.Dial(fullRequestURL, targetHeader)
+	dialer, err := service.GetWebsocketDialerWithOptions(
+		info.ChannelSetting.Proxy,
+		info.ChannelSetting.TLSInsecureSkipVerify,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create channel websocket dialer failed: %w", err)
+	}
+	targetConn, _, err := dialer.Dial(fullRequestURL, targetHeader)
 	if err != nil {
 		return nil, fmt.Errorf("dial failed to %s: %w", fullRequestURL, err)
 	}
@@ -488,15 +495,12 @@ func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	return doRequest(c, req, info)
 }
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
-	var client *http.Client
-	var err error
-	if info.ChannelSetting.Proxy != "" {
-		client, err = service.NewProxyHttpClient(info.ChannelSetting.Proxy)
-		if err != nil {
-			return nil, fmt.Errorf("new proxy http client failed: %w", err)
-		}
-	} else {
-		client = service.GetHttpClient()
+	client, err := service.GetHttpClientWithOptions(
+		info.ChannelSetting.Proxy,
+		info.ChannelSetting.TLSInsecureSkipVerify,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create channel http client failed: %w", err)
 	}
 
 	var stopPinger context.CancelFunc

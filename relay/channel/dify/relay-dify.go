@@ -98,7 +98,11 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", info.ApiKey))
 
 		// Send request
-		client := service.GetHttpClient()
+		client, err := service.GetHttpClientWithOptions(info.ChannelSetting.Proxy, info.ChannelSetting.TLSInsecureSkipVerify)
+		if err != nil {
+			common.SysLog("failed to create channel http client: " + err.Error())
+			return nil
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			common.SysLog("failed to send request: " + err.Error())

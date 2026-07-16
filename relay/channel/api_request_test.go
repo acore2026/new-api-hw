@@ -3,12 +3,41 @@ package channel
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDoRequest_TLSInsecureSkipVerifySupportsOpenAIAndAnthropic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	for _, path := range []string{"/v1/chat/completions", "/v1/messages"} {
+		t.Run(path, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodPost, path, nil)
+
+			req, err := http.NewRequest(http.MethodPost, server.URL+path, strings.NewReader("{}"))
+			require.NoError(t, err)
+			resp, err := doRequest(ctx, req, &relaycommon.RelayInfo{
+				ChannelMeta: &relaycommon.ChannelMeta{
+					ChannelSetting: dto.ChannelSettings{TLSInsecureSkipVerify: true},
+				},
+			})
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusNoContent, resp.StatusCode)
+		})
+	}
+}
 
 func TestProcessHeaderOverride_ChannelTestSkipsPassthroughRules(t *testing.T) {
 	t.Parallel()

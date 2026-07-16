@@ -3,15 +3,16 @@ package volcengine
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -154,7 +155,7 @@ func handleTTSResponse(c *gin.Context, resp *http.Response, info *relaycommon.Re
 	defer resp.Body.Close()
 
 	var volcResp VolcengineTTSResponse
-	if unmarshalErr := json.Unmarshal(body, &volcResp); unmarshalErr != nil {
+	if unmarshalErr := common.Unmarshal(body, &volcResp); unmarshalErr != nil {
 		return nil, types.NewErrorWithStatusCode(
 			errors.New("failed to parse volcengine response"),
 			types.ErrorCodeBadResponseBody,
@@ -209,7 +210,18 @@ func handleTTSWebSocketResponse(c *gin.Context, requestURL string, volcRequest V
 	header := http.Header{}
 	header.Set("Authorization", fmt.Sprintf("Bearer;%s", token))
 
-	conn, resp, dialErr := websocket.DefaultDialer.DialContext(context.Background(), requestURL, header)
+	dialer, dialerErr := service.GetWebsocketDialerWithOptions(
+		info.ChannelSetting.Proxy,
+		info.ChannelSetting.TLSInsecureSkipVerify,
+	)
+	if dialerErr != nil {
+		return nil, types.NewErrorWithStatusCode(
+			fmt.Errorf("failed to create websocket dialer: %w", dialerErr),
+			types.ErrorCodeBadResponseStatusCode,
+			http.StatusBadGateway,
+		)
+	}
+	conn, resp, dialErr := dialer.DialContext(context.Background(), requestURL, header)
 	if dialErr != nil {
 		if resp != nil {
 			return nil, types.NewErrorWithStatusCode(
@@ -226,7 +238,7 @@ func handleTTSWebSocketResponse(c *gin.Context, requestURL string, volcRequest V
 	}
 	defer conn.Close()
 
-	payload, marshalErr := json.Marshal(volcRequest)
+	payload, marshalErr := common.Marshal(volcRequest)
 	if marshalErr != nil {
 		return nil, types.NewErrorWithStatusCode(
 			fmt.Errorf("failed to marshal request: %w", marshalErr),

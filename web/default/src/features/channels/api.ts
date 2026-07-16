@@ -89,6 +89,7 @@ export type CodexCredentialRefreshResponse = {
 
 export type W3OAuthSettingsPayload = {
   proxy?: string
+  tls_insecure_skip_verify?: boolean
   w3_provider_id?: string
   w3_verify_tls?: boolean
   w3_api_base_url?: string
@@ -585,6 +586,8 @@ export async function fetchModels(data: {
   base_url: string
   type: number
   key: string
+  proxy?: string
+  tls_insecure_skip_verify?: boolean
 }): Promise<FetchModelsResponse> {
   const res = await api.post(
     '/api/channel/fetch_models',
