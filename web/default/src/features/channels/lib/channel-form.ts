@@ -69,6 +69,8 @@ export const channelFormSchema = z.object({
   proxy: z.string().optional(),
   tls_insecure_skip_verify: z.boolean().optional(),
   pass_through_body_enabled: z.boolean().optional(),
+  minimax_compatibility_enabled: z.boolean().optional(),
+  strip_claude_code_billing_metadata: z.boolean().optional(),
   system_prompt: z.string().optional(),
   system_prompt_override: z.boolean().optional(),
   // Type-specific settings (stored in settings JSON)
@@ -138,6 +140,8 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   proxy: '',
   tls_insecure_skip_verify: false,
   pass_through_body_enabled: false,
+  minimax_compatibility_enabled: false,
+  strip_claude_code_billing_metadata: false,
   system_prompt: '',
   system_prompt_override: false,
   // Type-specific settings
@@ -185,6 +189,8 @@ export function transformChannelToFormDefaults(
     proxy: '',
     tls_insecure_skip_verify: false,
     pass_through_body_enabled: false,
+    minimax_compatibility_enabled: false,
+    strip_claude_code_billing_metadata: false,
     system_prompt: '',
     system_prompt_override: false,
   }
@@ -198,6 +204,10 @@ export function transformChannelToFormDefaults(
         proxy: parsed.proxy || '',
         tls_insecure_skip_verify: parsed.tls_insecure_skip_verify === true,
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
+        minimax_compatibility_enabled:
+          parsed.minimax_compatibility_enabled === true,
+        strip_claude_code_billing_metadata:
+          parsed.strip_claude_code_billing_metadata === true,
         system_prompt: parsed.system_prompt || '',
         system_prompt_override: parsed.system_prompt_override || false,
       }
@@ -340,6 +350,11 @@ function buildSettingJSON(formData: ChannelFormValues): string {
     proxy: formData.proxy || '',
     tls_insecure_skip_verify: formData.tls_insecure_skip_verify === true,
     pass_through_body_enabled: formData.pass_through_body_enabled || false,
+    minimax_compatibility_enabled:
+      formData.type === 1 && formData.minimax_compatibility_enabled === true,
+    strip_claude_code_billing_metadata:
+      formData.type === 14 &&
+      formData.strip_claude_code_billing_metadata === true,
     system_prompt: formData.system_prompt || '',
     system_prompt_override: formData.system_prompt_override || false,
   }

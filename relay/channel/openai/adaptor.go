@@ -345,8 +345,19 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 			}
 		}
 	}
+	if isMiniMaxCompatibilityEnabled(info) {
+		info.FinalRequestRelayFormat = types.RelayFormatOpenAI
+		service.ApplyMiniMaxOpenAIRequestCompatibility(request)
+	}
 
 	return request, nil
+}
+
+func isMiniMaxCompatibilityEnabled(info *relaycommon.RelayInfo) bool {
+	return info != nil &&
+		info.ChannelMeta != nil &&
+		info.ChannelType == constant.ChannelTypeOpenAI &&
+		info.ChannelSetting.MiniMaxCompatibilityEnabled
 }
 
 func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {
@@ -608,7 +619,12 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 	} else if info.RelayMode == relayconstant.RelayModeRealtime {
 		return channel.DoWssRequest(a, c, info, requestBody)
 	} else {
-		return channel.DoApiRequest(a, c, info, requestBody)
+		resp, err := channel.DoApiRequest(a, c, info, requestBody)
+		if err != nil || !isMiniMaxCompatibilityEnabled(info) {
+			return resp, err
+		}
+		service.WrapUpstreamResponseTrace(c, resp)
+		return service.ValidateMiniMaxCompatibilityResponse(c, info, resp)
 	}
 }
 

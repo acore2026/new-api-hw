@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -25,6 +27,9 @@ func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dt
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
+	if shouldStripClaudeCodeBillingMetadata(info) {
+		service.StripClaudeCodeBillingMetadata(request)
+	}
 	return request, nil
 }
 
@@ -95,7 +100,21 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	return RequestOpenAI2ClaudeMessage(c, *request)
+	claudeRequest, err := RequestOpenAI2ClaudeMessage(c, *request)
+	if err != nil {
+		return nil, err
+	}
+	if shouldStripClaudeCodeBillingMetadata(info) {
+		service.StripClaudeCodeBillingMetadata(claudeRequest)
+	}
+	return claudeRequest, nil
+}
+
+func shouldStripClaudeCodeBillingMetadata(info *relaycommon.RelayInfo) bool {
+	return info != nil &&
+		info.ChannelMeta != nil &&
+		info.ChannelType == constant.ChannelTypeAnthropic &&
+		info.ChannelSetting.StripClaudeCodeBillingMetadata
 }
 
 func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {

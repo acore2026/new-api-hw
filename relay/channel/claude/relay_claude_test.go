@@ -5,12 +5,38 @@ import (
 	"strings"
 	"testing"
 
+	channelconstant "github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/stretchr/testify/require"
 )
 
 func commonPointer[T any](value T) *T {
 	return &value
+}
+
+func TestConvertClaudeRequestStripsClaudeCodeBillingMetadataWhenEnabled(t *testing.T) {
+	request := &dto.ClaudeRequest{
+		Model:  "claude-sonnet-4-5",
+		System: "x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=cli; cch=abc;You are Claude Code",
+		Messages: []dto.ClaudeMessage{
+			{Role: "user", Content: "keep this"},
+		},
+	}
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType: channelconstant.ChannelTypeAnthropic,
+			ChannelSetting: dto.ChannelSettings{
+				StripClaudeCodeBillingMetadata: true,
+			},
+		},
+	}
+
+	got, err := (&Adaptor{}).ConvertClaudeRequest(nil, info, request)
+	require.NoError(t, err)
+	converted := got.(*dto.ClaudeRequest)
+	require.Equal(t, "You are Claude Code", converted.GetStringSystem())
+	require.Equal(t, "keep this", converted.Messages[0].GetStringContent())
 }
 
 func TestFormatClaudeResponseInfo_MessageStart(t *testing.T) {

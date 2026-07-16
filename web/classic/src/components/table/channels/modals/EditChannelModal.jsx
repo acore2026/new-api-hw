@@ -194,6 +194,8 @@ const EditChannelModal = (props) => {
     proxy: '',
     tls_insecure_skip_verify: false,
     pass_through_body_enabled: false,
+    minimax_compatibility_enabled: false,
+    strip_claude_code_billing_metadata: false,
     system_prompt: '',
     system_prompt_override: false,
     settings: '',
@@ -518,6 +520,8 @@ const EditChannelModal = (props) => {
     proxy: '',
     tls_insecure_skip_verify: false,
     pass_through_body_enabled: false,
+    minimax_compatibility_enabled: false,
+    strip_claude_code_billing_metadata: false,
     system_prompt: '',
   });
   const showApiConfigCard = true; // 控制是否显示 API 配置卡片
@@ -871,6 +875,10 @@ const EditChannelModal = (props) => {
             parsedSettings.tls_insecure_skip_verify === true;
           data.pass_through_body_enabled =
             parsedSettings.pass_through_body_enabled || false;
+          data.minimax_compatibility_enabled =
+            parsedSettings.minimax_compatibility_enabled === true;
+          data.strip_claude_code_billing_metadata =
+            parsedSettings.strip_claude_code_billing_metadata === true;
           data.system_prompt = parsedSettings.system_prompt || '';
           data.system_prompt_override =
             parsedSettings.system_prompt_override || false;
@@ -881,6 +889,8 @@ const EditChannelModal = (props) => {
           data.proxy = '';
           data.tls_insecure_skip_verify = false;
           data.pass_through_body_enabled = false;
+          data.minimax_compatibility_enabled = false;
+          data.strip_claude_code_billing_metadata = false;
           data.system_prompt = '';
           data.system_prompt_override = false;
         }
@@ -890,6 +900,8 @@ const EditChannelModal = (props) => {
         data.proxy = '';
         data.tls_insecure_skip_verify = false;
         data.pass_through_body_enabled = false;
+        data.minimax_compatibility_enabled = false;
+        data.strip_claude_code_billing_metadata = false;
         data.system_prompt = '';
         data.system_prompt_override = false;
       }
@@ -1000,6 +1012,9 @@ const EditChannelModal = (props) => {
         proxy: data.proxy,
         tls_insecure_skip_verify: data.tls_insecure_skip_verify,
         pass_through_body_enabled: data.pass_through_body_enabled,
+        minimax_compatibility_enabled: data.minimax_compatibility_enabled,
+        strip_claude_code_billing_metadata:
+          data.strip_claude_code_billing_metadata,
         system_prompt: data.system_prompt,
         system_prompt_override: data.system_prompt_override || false,
       });
@@ -1043,6 +1058,8 @@ const EditChannelModal = (props) => {
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
         data.pass_through_body_enabled ||
+        data.minimax_compatibility_enabled ||
+        data.strip_claude_code_billing_metadata ||
         data.force_format ||
         data.claude_beta_query ||
         data.system_prompt_override;
@@ -1394,6 +1411,8 @@ const EditChannelModal = (props) => {
       proxy: '',
       tls_insecure_skip_verify: false,
       pass_through_body_enabled: false,
+      minimax_compatibility_enabled: false,
+      strip_claude_code_billing_metadata: false,
       system_prompt: '',
       system_prompt_override: false,
     });
@@ -1766,6 +1785,12 @@ const EditChannelModal = (props) => {
       tls_insecure_skip_verify:
         localInputs.tls_insecure_skip_verify === true,
       pass_through_body_enabled: localInputs.pass_through_body_enabled || false,
+      minimax_compatibility_enabled:
+        localInputs.type === 1 &&
+        localInputs.minimax_compatibility_enabled === true,
+      strip_claude_code_billing_metadata:
+        localInputs.type === 14 &&
+        localInputs.strip_claude_code_billing_metadata === true,
       system_prompt: localInputs.system_prompt || '',
       system_prompt_override: localInputs.system_prompt_override || false,
     };
@@ -1848,6 +1873,8 @@ const EditChannelModal = (props) => {
     delete localInputs.proxy;
     delete localInputs.tls_insecure_skip_verify;
     delete localInputs.pass_through_body_enabled;
+    delete localInputs.minimax_compatibility_enabled;
+    delete localInputs.strip_claude_code_billing_metadata;
     delete localInputs.system_prompt;
     delete localInputs.system_prompt_override;
     delete localInputs.is_enterprise_account;
@@ -2531,11 +2558,17 @@ const EditChannelModal = (props) => {
                   </Text>
 
                   {inputs.type === 14 && (
-                    <Form.Switch field='claude_beta_query' label={t('Claude 强制 beta=true')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelOtherSettingsChange('claude_beta_query', value)} extraText={t('开启后，该渠道请求 Claude 时将强制追加 ?beta=true（无需客户端手动传参）')} />
+                    <>
+                      <Form.Switch field='claude_beta_query' label={t('Claude 强制 beta=true')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelOtherSettingsChange('claude_beta_query', value)} extraText={t('开启后，该渠道请求 Claude 时将强制追加 ?beta=true（无需客户端手动传参）')} />
+                      <Form.Switch field='strip_claude_code_billing_metadata' label={t('移除 Claude Code 计费元数据')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('strip_claude_code_billing_metadata', value)} extraText={t('发送到 Anthropic 前，从提示词中移除 Claude Code 计费元数据前缀')} />
+                    </>
                   )}
 
                   {inputs.type === 1 && (
-                    <Form.Switch field='force_format' label={t('强制格式化')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('force_format', value)} extraText={t('强制将响应格式化为 OpenAI 标准格式（只适用于OpenAI渠道类型）')} />
+                    <>
+                      <Form.Switch field='force_format' label={t('强制格式化')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('force_format', value)} extraText={t('强制将响应格式化为 OpenAI 标准格式（只适用于OpenAI渠道类型）')} />
+                      <Form.Switch field='minimax_compatibility_enabled' label={t('MiniMax 兼容模式')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('minimax_compatibility_enabled', value)} extraText={t('对此 OpenAI 渠道应用 W3 MiniMax 请求兼容处理和嵌入式错误检测')} />
+                    </>
                   )}
 
                   <Form.Switch field='thinking_to_content' label={t('思考内容转换')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('thinking_to_content', value)} extraText={t('将 reasoning_content 转换为 <think> 标签拼接到内容中')} />

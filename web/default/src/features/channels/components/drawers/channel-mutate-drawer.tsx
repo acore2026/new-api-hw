@@ -243,6 +243,8 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.force_format ||
     values.thinking_to_content ||
     values.pass_through_body_enabled ||
+    values.minimax_compatibility_enabled ||
+    values.strip_claude_code_billing_metadata ||
     values.system_prompt_override ||
     values.claude_beta_query ||
     values.upstream_model_update_check_enabled ||
@@ -3407,16 +3409,70 @@ export function ChannelMutateDrawer({
 
                     <div className='divide-border space-y-0 divide-y border-y'>
                       {currentType === 1 && (
+                        <>
+                          <FormField
+                            control={form.control}
+                            name='force_format'
+                            render={({ field }) => (
+                              <FormItem className='flex items-center justify-between px-4 py-3'>
+                                <div className='space-y-0.5'>
+                                  <FormLabel>{t('Force Format')}</FormLabel>
+                                  <FormDescription>
+                                    {t(
+                                      'Force format response to OpenAI standard (OpenAI channel only)'
+                                    )}
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name='minimax_compatibility_enabled'
+                            render={({ field }) => (
+                              <FormItem className='flex items-center justify-between gap-3 px-4 py-3'>
+                                <div className='space-y-0.5'>
+                                  <FormLabel>
+                                    {t('MiniMax compatibility')}
+                                  </FormLabel>
+                                  <FormDescription>
+                                    {t(
+                                      'Apply W3 MiniMax request hardening and embedded error detection to this OpenAI channel'
+                                    )}
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      )}
+
+                      {currentType === 14 && (
                         <FormField
                           control={form.control}
-                          name='force_format'
+                          name='strip_claude_code_billing_metadata'
                           render={({ field }) => (
-                            <FormItem className='flex items-center justify-between px-4 py-3'>
+                            <FormItem className='flex items-center justify-between gap-3 px-4 py-3'>
                               <div className='space-y-0.5'>
-                                <FormLabel>{t('Force Format')}</FormLabel>
+                                <FormLabel>
+                                  {t('Strip Claude Code billing metadata')}
+                                </FormLabel>
                                 <FormDescription>
                                   {t(
-                                    'Force format response to OpenAI standard (OpenAI channel only)'
+                                    'Remove Claude Code billing metadata prefixes from prompts before sending them to Anthropic'
                                   )}
                                 </FormDescription>
                               </div>

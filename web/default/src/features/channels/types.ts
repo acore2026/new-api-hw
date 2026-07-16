@@ -85,6 +85,8 @@ export interface ChannelSettings {
   proxy?: string
   tls_insecure_skip_verify?: boolean
   pass_through_body_enabled?: boolean
+  minimax_compatibility_enabled?: boolean
+  strip_claude_code_billing_metadata?: boolean
   system_prompt?: string
   system_prompt_override?: boolean
 }
