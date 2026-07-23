@@ -297,6 +297,67 @@ function SubHeading({ title, icon }: { title: string; icon?: ReactNode }) {
   )
 }
 
+function CompactSettingsCollapsible({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
+        render={
+          <button
+            type='button'
+            className='bg-muted/20 hover:bg-accent/50 flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors'
+          />
+        }
+      >
+        <div className='flex min-w-0 flex-col gap-0.5'>
+          <span className='text-sm font-medium'>{title}</span>
+          <span className='text-muted-foreground truncate text-xs'>
+            {description}
+          </span>
+        </div>
+        <ChevronDown
+          className={cn(
+            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
+            open && 'rotate-180'
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className='mt-3 flex flex-col gap-4 rounded-lg border border-dashed p-4'>
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function ConditionalAdvancedSection({
+  collapsed,
+  title,
+  description,
+  children,
+}: {
+  collapsed: boolean
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  if (!collapsed) return <>{children}</>
+
+  return (
+    <CompactSettingsCollapsible title={title} description={description}>
+      {children}
+    </CompactSettingsCollapsible>
+  )
+}
+
 export function ChannelMutateDrawer({
   open,
   onOpenChange,
@@ -306,7 +367,6 @@ export function ChannelMutateDrawer({
   const queryClient = useQueryClient()
   const { setOpen } = useChannels()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [customModel, setCustomModel] = useState('')
   const [isFetchingModels, setIsFetchingModels] = useState(false)
   const [fetchModelsDialogOpen, setFetchModelsDialogOpen] = useState(false)
   const [channelKey, setChannelKey] = useState<string | null>(null)
@@ -867,16 +927,6 @@ export function ChannelMutateDrawer({
       setIsFetchingModels(false)
     }
   }, [isEditing, currentRow, form, t, updateModels])
-
-  // Handle adding custom models
-  const handleAddCustomModels = useCallback(() => {
-    if (!customModel?.trim()) return
-
-    const modelArray = parseModelsString(customModel)
-    const count = updateModels(modelArray, true)
-    setCustomModel('')
-    toast.success(t('Added {{count}} custom model(s)', { count }))
-  }, [customModel, t, updateModels])
 
   // Handle model operations
   const handleFillRelatedModels = useCallback(() => {
@@ -1526,159 +1576,260 @@ export function ChannelMutateDrawer({
                     />
 
                     {w3OAuthEnabled && (
-                      <div className='grid gap-4 md:grid-cols-2'>
-                        <FormField
-                          control={form.control}
-                          name='w3_api_base_url'
-                          render={({ field }) => (
-                            <FormItem className='md:col-span-2'>
-                              <FormLabel>{t('W3 API Base URL')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={W3_DEFAULTS.apiBaseUrl}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_provider_id'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Provider ID')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={W3_DEFAULTS.providerId}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_scope'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Scope')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={W3_DEFAULTS.scope}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_auth_url'
-                          render={({ field }) => (
-                            <FormItem className='md:col-span-2'>
-                              <FormLabel>{t('Authorization URL')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={W3_DEFAULTS.authUrl}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_token_url'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Token URL')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/getToken`}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_refresh_url'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Refresh URL')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/refreshToken`}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_client_id'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Client ID')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={W3_DEFAULTS.clientId}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_callback_url_base'
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t('Callback URL Base')}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/callback`}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name='w3_verify_tls'
-                          render={({ field }) => (
-                            <FormItem className='flex items-center justify-between rounded-lg border p-4 md:col-span-2'>
-                              <div className='space-y-0.5'>
-                                <FormLabel>{t('Verify TLS')}</FormLabel>
-                                <FormDescription>
-                                  {t(
-                                    'Enable normal TLS verification for W3 endpoints.'
-                                  )}
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+                      <div className='bg-primary/5 flex flex-col gap-3 rounded-lg border p-4'>
+                        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                          <div className='flex flex-col gap-0.5'>
+                            <div className='text-sm font-semibold'>
+                              {t('Huawei W3 Authorization')}
+                            </div>
+                            <div className='text-muted-foreground text-xs'>
+                              {t(
+                                'W3 CodeAgent channels use an OAuth JSON credential as the key.'
+                              )}
+                            </div>
+                          </div>
+                          <div className='flex flex-wrap items-center gap-2'>
+                            <Button
+                              type='button'
+                              size='sm'
+                              onClick={() => setW3OAuthDialogOpen(true)}
+                            >
+                              <Link2 data-icon='inline-start' />
+                              {t('Authorize')}
+                            </Button>
+                            {isEditing && channelId && (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                onClick={handleRefreshW3Credential}
+                                disabled={isW3CredentialRefreshing}
+                              >
+                                {isW3CredentialRefreshing ? (
+                                  <Loader2
+                                    className='animate-spin'
+                                    data-icon='inline-start'
+                                  />
+                                ) : (
+                                  <RefreshCw data-icon='inline-start' />
+                                )}
+                                {isW3CredentialRefreshing
+                                  ? t('Refreshing...')
+                                  : t('Refresh credential')}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <Alert>
+                          <AlertDescription>
+                            {t(
+                              'If authorization succeeds before save, the generated W3 JSON will be inserted into the key field.'
+                            )}
+                          </AlertDescription>
+                        </Alert>
                       </div>
                     )}
+
+                    <CompactSettingsCollapsible
+                      title={t('Advanced CodeAgent connection')}
+                      description={t(
+                        'URLs, OAuth endpoints, client identity, and TLS verification'
+                      )}
+                    >
+                      <FormField
+                        control={form.control}
+                        name='base_url'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Base URL')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t(FIELD_PLACEHOLDERS.BASE_URL)}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Custom API base URL. For official channels, New API has built-in addresses. Only fill this for third-party proxy sites or special endpoints. Do not add /v1 or trailing slash.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {w3OAuthEnabled && (
+                        <div className='grid gap-4 md:grid-cols-2'>
+                          <FormField
+                            control={form.control}
+                            name='w3_api_base_url'
+                            render={({ field }) => (
+                              <FormItem className='md:col-span-2'>
+                                <FormLabel>{t('W3 API Base URL')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={W3_DEFAULTS.apiBaseUrl}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_provider_id'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Provider ID')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={W3_DEFAULTS.providerId}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_scope'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Scope')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={W3_DEFAULTS.scope}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_auth_url'
+                            render={({ field }) => (
+                              <FormItem className='md:col-span-2'>
+                                <FormLabel>{t('Authorization URL')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={W3_DEFAULTS.authUrl}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_token_url'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Token URL')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/getToken`}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_refresh_url'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Refresh URL')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/refreshToken`}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_client_id'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Client ID')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={W3_DEFAULTS.clientId}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_callback_url_base'
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t('Callback URL Base')}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={`${W3_DEFAULTS.apiBaseUrl}/oauth/callback`}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name='w3_verify_tls'
+                            render={({ field }) => (
+                              <FormItem className='flex items-center justify-between rounded-lg border p-4 md:col-span-2'>
+                                <div className='flex flex-col gap-0.5'>
+                                  <FormLabel>{t('Verify TLS')}</FormLabel>
+                                  <FormDescription>
+                                    {t(
+                                      'Enable normal TLS verification for W3 endpoints.'
+                                    )}
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </CompactSettingsCollapsible>
+
+                    <W3OAuthDialog
+                      open={w3OAuthDialogOpen}
+                      onOpenChange={setW3OAuthDialogOpen}
+                      channelId={isEditing ? channelId : undefined}
+                      settings={getW3OAuthSettingsPayload()}
+                      onKeyGenerated={(key) => {
+                        form.setValue('key', key, { shouldDirty: true })
+                      }}
+                      onSaved={() => {
+                        if (channelId) {
+                          queryClient.invalidateQueries({
+                            queryKey: channelsQueryKeys.detail(channelId),
+                          })
+                        }
+                      }}
+                    />
                   </div>
                 )}
 
@@ -2052,7 +2203,7 @@ export function ChannelMutateDrawer({
                 )}
 
                 {/* General base_url for other types */}
-                {![3, 8, 22, 36, 45].includes(currentType) && (
+                {![3, 8, 22, 35, 36, 45].includes(currentType) && (
                   <FormField
                     control={form.control}
                     name='base_url'
@@ -2076,428 +2227,366 @@ export function ChannelMutateDrawer({
                   />
                 )}
 
-                <div className='border-border/60 border-t pt-4'>
-                  <SubHeading
-                    title={t('Authentication')}
-                    icon={<KeyRound className='h-3.5 w-3.5' />}
-                  />
-                </div>
-                {!isEditing && (
+                <ConditionalAdvancedSection
+                  collapsed={currentType === 35}
+                  title={t('Advanced credentials')}
+                  description={t(
+                    'Manual keys, saved tokens, and multi-key behavior'
+                  )}
+                >
+                  <div className='border-border/60 border-t pt-4'>
+                    <SubHeading
+                      title={t('Authentication')}
+                      icon={<KeyRound className='h-3.5 w-3.5' />}
+                    />
+                  </div>
+                  {!isEditing && (
+                    <FormField
+                      control={form.control}
+                      name='multi_key_mode'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Add Mode')}</FormLabel>
+                          <Select
+                            items={[
+                              ...ADD_MODE_OPTIONS.map((option) => ({
+                                value: option.value,
+                                label: t(option.label),
+                              })),
+                            ]}
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectGroup>
+                                {ADD_MODE_OPTIONS.map((option) => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {t(option.label)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {t(FIELD_DESCRIPTIONS.BATCH_ADD)}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <FormField
                     control={form.control}
-                    name='multi_key_mode'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Add Mode')}</FormLabel>
-                        <Select
-                          items={[
-                            ...ADD_MODE_OPTIONS.map((option) => ({
-                              value: option.value,
-                              label: t(option.label),
-                            })),
-                          ]}
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent alignItemWithTrigger={false}>
-                            <SelectGroup>
-                              {ADD_MODE_OPTIONS.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {t(option.label)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {t(FIELD_DESCRIPTIONS.BATCH_ADD)}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                <FormField
-                  control={form.control}
-                  name='key'
-                  render={({ field }) => {
-                    const keyPlaceholder = (() => {
-                      if (isEditing) {
-                        return t('Leave empty to keep existing key')
-                      }
-                      if (currentType === 33) {
-                        if (awsKeyType === 'api_key') {
+                    name='key'
+                    render={({ field }) => {
+                      const keyPlaceholder = (() => {
+                        if (isEditing) {
+                          return t('Leave empty to keep existing key')
+                        }
+                        if (currentType === 33) {
+                          if (awsKeyType === 'api_key') {
+                            return isBatchMode
+                              ? t(
+                                  'Enter API Key, one per line, format: APIKey|Region'
+                                )
+                              : t('Enter API Key, format: APIKey|Region')
+                          }
                           return isBatchMode
                             ? t(
-                                'Enter API Key, one per line, format: APIKey|Region'
+                                'Enter key, one per line, format: AccessKey|SecretAccessKey|Region'
                               )
-                            : t('Enter API Key, format: APIKey|Region')
+                            : t(
+                                'Enter key, format: AccessKey|SecretAccessKey|Region'
+                              )
                         }
-                        return isBatchMode
-                          ? t(
-                              'Enter key, one per line, format: AccessKey|SecretAccessKey|Region'
-                            )
-                          : t(
-                              'Enter key, format: AccessKey|SecretAccessKey|Region'
-                            )
-                      }
-                      if (isBatchMode) {
-                        return t('Enter one key per line for batch creation')
-                      }
-                      return t(getKeyPromptForType(currentType))
-                    })()
-                    return (
-                      <FormItem>
-                        <FormLabel>{t('API Key *')}</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder={keyPlaceholder}
-                            rows={isBatchMode ? 8 : 4}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          <div className='flex flex-col gap-2'>
-                            <span>
-                              {isEditing ? (
-                                <>
-                                  {t(
-                                    'Enter new key to update, or leave empty to keep current key'
-                                  )}
-                                  {isMultiKeyChannel && (
-                                    <span className='text-warning mt-1 block'>
-                                      {t('Multi-key channel: Keys will be')}{' '}
-                                      {keyMode === 'replace'
-                                        ? t('replaced')
-                                        : t('appended')}
-                                    </span>
-                                  )}
-                                </>
-                              ) : isBatchMode ? (
-                                t(
-                                  'Enter one API key per line for batch creation'
-                                )
-                              ) : (
-                                t(FIELD_DESCRIPTIONS.KEY)
-                              )}
-                            </span>
-                            {isBatchMode && (
-                              <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={handleDeduplicateKeys}
-                                className='w-fit'
-                              >
-                                <Trash2 className='mr-2 h-4 w-4' />
-                                {t('Remove Duplicates')}
-                              </Button>
-                            )}
-                          </div>
-                        </FormDescription>
-                        {isEditing && (
-                          <div className='mt-4 space-y-3 rounded-lg border border-dashed p-4'>
-                            <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                              <div>
-                                <p className='text-sm font-medium'>
-                                  {t('Current key')}
-                                </p>
-                                <p className='text-muted-foreground text-xs'>
-                                  {t(
-                                    'Verification required to reveal the saved key.'
-                                  )}
-                                </p>
-                              </div>
-                              <div className='flex items-center gap-2'>
+                        if (isBatchMode) {
+                          return t('Enter one key per line for batch creation')
+                        }
+                        return t(getKeyPromptForType(currentType))
+                      })()
+                      return (
+                        <FormItem>
+                          <FormLabel>{t('API Key *')}</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder={keyPlaceholder}
+                              rows={isBatchMode ? 8 : 4}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            <div className='flex flex-col gap-2'>
+                              <span>
+                                {isEditing ? (
+                                  <>
+                                    {t(
+                                      'Enter new key to update, or leave empty to keep current key'
+                                    )}
+                                    {isMultiKeyChannel && (
+                                      <span className='text-warning mt-1 block'>
+                                        {t('Multi-key channel: Keys will be')}{' '}
+                                        {keyMode === 'replace'
+                                          ? t('replaced')
+                                          : t('appended')}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : isBatchMode ? (
+                                  t(
+                                    'Enter one API key per line for batch creation'
+                                  )
+                                ) : (
+                                  t(FIELD_DESCRIPTIONS.KEY)
+                                )}
+                              </span>
+                              {isBatchMode && (
                                 <Button
                                   type='button'
                                   variant='outline'
                                   size='sm'
-                                  onClick={handleRevealKey}
-                                  disabled={
-                                    isChannelKeyLoading ||
-                                    verificationState.loading
-                                  }
+                                  onClick={handleDeduplicateKeys}
+                                  className='w-fit'
                                 >
-                                  {isChannelKeyLoading ||
-                                  verificationState.loading ? (
-                                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                                  ) : (
-                                    <Eye className='mr-2 h-4 w-4' />
-                                  )}
-                                  {t('Reveal key')}
+                                  <Trash2 className='mr-2 h-4 w-4' />
+                                  {t('Remove Duplicates')}
                                 </Button>
-                                <Button
-                                  type='button'
-                                  variant='ghost'
-                                  size='sm'
-                                  onClick={async () => {
-                                    if (channelKey) {
-                                      await copyToClipboard(channelKey)
-                                    }
-                                  }}
-                                  disabled={!channelKey}
-                                >
-                                  <Copy className='mr-2 h-4 w-4' />
-                                  {t('Copy')}
-                                </Button>
-                              </div>
+                              )}
                             </div>
-                            <Input
-                              readOnly
-                              value={channelKey ?? ''}
-                              placeholder={t('Hidden — verify to reveal')}
-                              className='font-mono'
-                            />
+                          </FormDescription>
+                          {isEditing && (
+                            <div className='mt-4 space-y-3 rounded-lg border border-dashed p-4'>
+                              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                                <div>
+                                  <p className='text-sm font-medium'>
+                                    {t('Current key')}
+                                  </p>
+                                  <p className='text-muted-foreground text-xs'>
+                                    {t(
+                                      'Verification required to reveal the saved key.'
+                                    )}
+                                  </p>
+                                </div>
+                                <div className='flex items-center gap-2'>
+                                  <Button
+                                    type='button'
+                                    variant='outline'
+                                    size='sm'
+                                    onClick={handleRevealKey}
+                                    disabled={
+                                      isChannelKeyLoading ||
+                                      verificationState.loading
+                                    }
+                                  >
+                                    {isChannelKeyLoading ||
+                                    verificationState.loading ? (
+                                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                    ) : (
+                                      <Eye className='mr-2 h-4 w-4' />
+                                    )}
+                                    {t('Reveal key')}
+                                  </Button>
+                                  <Button
+                                    type='button'
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={async () => {
+                                      if (channelKey) {
+                                        await copyToClipboard(channelKey)
+                                      }
+                                    }}
+                                    disabled={!channelKey}
+                                  >
+                                    <Copy className='mr-2 h-4 w-4' />
+                                    {t('Copy')}
+                                  </Button>
+                                </div>
+                              </div>
+                              <Input
+                                readOnly
+                                value={channelKey ?? ''}
+                                placeholder={t('Hidden — verify to reveal')}
+                                className='font-mono'
+                              />
+                            </div>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
+                  />
+
+                  {currentType === 57 && (
+                    <div className='bg-muted/20 space-y-3 rounded-lg border p-4'>
+                      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                        <div className='space-y-0.5'>
+                          <div className='text-sm font-semibold'>
+                            {t('Codex Authorization')}
                           </div>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )
-                  }}
-                />
-
-                {currentType === 35 && w3OAuthEnabled && (
-                  <div className='bg-muted/20 space-y-3 rounded-lg border p-4'>
-                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                      <div className='space-y-0.5'>
-                        <div className='text-sm font-semibold'>
-                          {t('Huawei W3 Authorization')}
+                          <div className='text-muted-foreground text-xs'>
+                            {t(
+                              'Codex channels use an OAuth JSON credential as the key.'
+                            )}
+                          </div>
                         </div>
-                        <div className='text-muted-foreground text-xs'>
-                          {t(
-                            'W3 CodeAgent channels use an OAuth JSON credential as the key.'
-                          )}
-                        </div>
-                      </div>
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => setW3OAuthDialogOpen(true)}
-                        >
-                          <Link2 className='mr-2 h-4 w-4' />
-                          {t('Authorize')}
-                        </Button>
-                        {isEditing && channelId && (
+                        <div className='flex flex-wrap items-center gap-2'>
                           <Button
                             type='button'
                             variant='outline'
                             size='sm'
-                            onClick={handleRefreshW3Credential}
-                            disabled={isW3CredentialRefreshing}
+                            onClick={() => setCodexOAuthDialogOpen(true)}
                           >
-                            {isW3CredentialRefreshing ? (
-                              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                            ) : (
-                              <RefreshCw className='mr-2 h-4 w-4' />
-                            )}
-                            {isW3CredentialRefreshing
-                              ? t('Refreshing...')
-                              : t('Refresh credential')}
+                            <Link2 className='mr-2 h-4 w-4' />
+                            {t('Authorize')}
                           </Button>
-                        )}
-                      </div>
-                    </div>
-                    <Alert>
-                      <AlertDescription>
-                        {t(
-                          'If authorization succeeds before save, the generated W3 JSON will be inserted into the key field.'
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                )}
-
-                {currentType === 57 && (
-                  <div className='bg-muted/20 space-y-3 rounded-lg border p-4'>
-                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                      <div className='space-y-0.5'>
-                        <div className='text-sm font-semibold'>
-                          {t('Codex Authorization')}
-                        </div>
-                        <div className='text-muted-foreground text-xs'>
-                          {t(
-                            'Codex channels use an OAuth JSON credential as the key.'
+                          {isEditing && channelId && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={handleRefreshCodexCredential}
+                              disabled={isCodexCredentialRefreshing}
+                            >
+                              {isCodexCredentialRefreshing ? (
+                                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                              ) : (
+                                <RefreshCw className='mr-2 h-4 w-4' />
+                              )}
+                              {isCodexCredentialRefreshing
+                                ? t('Refreshing...')
+                                : t('Refresh credential')}
+                            </Button>
                           )}
                         </div>
                       </div>
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => setCodexOAuthDialogOpen(true)}
-                        >
-                          <Link2 className='mr-2 h-4 w-4' />
-                          {t('Authorize')}
-                        </Button>
-                        {isEditing && channelId && (
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={handleRefreshCodexCredential}
-                            disabled={isCodexCredentialRefreshing}
-                          >
-                            {isCodexCredentialRefreshing ? (
-                              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                            ) : (
-                              <RefreshCw className='mr-2 h-4 w-4' />
-                            )}
-                            {isCodexCredentialRefreshing
-                              ? t('Refreshing...')
-                              : t('Refresh credential')}
-                          </Button>
-                        )}
-                      </div>
+                      <Alert>
+                        <AlertDescription>
+                          {t(
+                            'If authorization succeeds, the generated JSON will be inserted into the key field. You still need to save the channel to persist it.'
+                          )}
+                        </AlertDescription>
+                      </Alert>
                     </div>
-                    <Alert>
-                      <AlertDescription>
-                        {t(
-                          'If authorization succeeds, the generated JSON will be inserted into the key field. You still need to save the channel to persist it.'
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                )}
+                  )}
 
-                <CodexOAuthDialog
-                  open={codexOAuthDialogOpen}
-                  onOpenChange={setCodexOAuthDialogOpen}
-                  onKeyGenerated={(key) => {
-                    form.setValue('key', key, { shouldDirty: true })
-                  }}
-                />
+                  <CodexOAuthDialog
+                    open={codexOAuthDialogOpen}
+                    onOpenChange={setCodexOAuthDialogOpen}
+                    onKeyGenerated={(key) => {
+                      form.setValue('key', key, { shouldDirty: true })
+                    }}
+                  />
 
-                <W3OAuthDialog
-                  open={w3OAuthDialogOpen}
-                  onOpenChange={setW3OAuthDialogOpen}
-                  channelId={isEditing ? channelId : undefined}
-                  settings={getW3OAuthSettingsPayload()}
-                  onKeyGenerated={(key) => {
-                    form.setValue('key', key, { shouldDirty: true })
-                  }}
-                  onSaved={() => {
-                    if (channelId) {
-                      queryClient.invalidateQueries({
-                        queryKey: channelsQueryKeys.detail(channelId),
-                      })
-                    }
-                  }}
-                />
+                  {isEditing && isMultiKeyChannel && (
+                    <FormField
+                      control={form.control}
+                      name='key_mode'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Key Update Mode')}</FormLabel>
+                          <Select
+                            items={[
+                              {
+                                value: 'append',
+                                label: t('Append to existing keys'),
+                              },
+                              {
+                                value: 'replace',
+                                label: t('Replace all existing keys'),
+                              },
+                            ]}
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectGroup>
+                                <SelectItem value='append'>
+                                  {t('Append to existing keys')}
+                                </SelectItem>
+                                <SelectItem value='replace'>
+                                  {t('Replace all existing keys')}
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {field.value === 'replace'
+                              ? t(
+                                  'Replace mode: Will completely replace all existing keys'
+                                )
+                              : t(
+                                  'Append mode: New keys will be added to the end of the existing key list'
+                                )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
-                {isEditing && isMultiKeyChannel && (
-                  <FormField
-                    control={form.control}
-                    name='key_mode'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Key Update Mode')}</FormLabel>
-                        <Select
-                          items={[
-                            {
-                              value: 'append',
-                              label: t('Append to existing keys'),
-                            },
-                            {
-                              value: 'replace',
-                              label: t('Replace all existing keys'),
-                            },
-                          ]}
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent alignItemWithTrigger={false}>
-                            <SelectGroup>
-                              <SelectItem value='append'>
-                                {t('Append to existing keys')}
-                              </SelectItem>
-                              <SelectItem value='replace'>
-                                {t('Replace all existing keys')}
-                              </SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {field.value === 'replace'
-                            ? t(
-                                'Replace mode: Will completely replace all existing keys'
+                  {!isEditing && multiKeyMode === 'multi_to_single' && (
+                    <FormField
+                      control={form.control}
+                      name='multi_key_type'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Multi-Key Strategy')}</FormLabel>
+                          <Select
+                            items={[
+                              { value: 'random', label: t('Random') },
+                              { value: 'polling', label: t('Polling') },
+                            ]}
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectGroup>
+                                <SelectItem value='random'>
+                                  {t('Random')}
+                                </SelectItem>
+                                <SelectItem value='polling'>
+                                  {t('Polling')}
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {multiKeyType === 'polling' ? (
+                              <span className='text-warning'>
+                                {t(
+                                  'Polling mode requires Redis and memory cache, otherwise performance will be significantly degraded'
+                                )}
+                              </span>
+                            ) : (
+                              t(
+                                'Randomly select a key from the pool for each request'
                               )
-                            : t(
-                                'Append mode: New keys will be added to the end of the existing key list'
-                              )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {!isEditing && multiKeyMode === 'multi_to_single' && (
-                  <FormField
-                    control={form.control}
-                    name='multi_key_type'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Multi-Key Strategy')}</FormLabel>
-                        <Select
-                          items={[
-                            { value: 'random', label: t('Random') },
-                            { value: 'polling', label: t('Polling') },
-                          ]}
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent alignItemWithTrigger={false}>
-                            <SelectGroup>
-                              <SelectItem value='random'>
-                                {t('Random')}
-                              </SelectItem>
-                              <SelectItem value='polling'>
-                                {t('Polling')}
-                              </SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {multiKeyType === 'polling' ? (
-                            <span className='text-warning'>
-                              {t(
-                                'Polling mode requires Redis and memory cache, otherwise performance will be significantly degraded'
-                              )}
-                            </span>
-                          ) : (
-                            t(
-                              'Randomly select a key from the pool for each request'
-                            )
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </ConditionalAdvancedSection>
               </div>
 
               {/* ── Models & Groups ── */}
@@ -2518,12 +2607,35 @@ export function ChannelMutateDrawer({
                           selected={currentModelsArray}
                           onChange={handleModelsChange}
                           placeholder={t('Select models or add custom ones')}
+                          allowCreate
+                          createLabel='Add custom model "{{value}}"'
+                          emptyText={t(
+                            'Type a model name to add it to this channel'
+                          )}
                         />
                       </FormControl>
                       <FormDescription>
                         <div className='flex flex-col gap-2'>
                           <span>{t(FIELD_DESCRIPTIONS.MODELS)}</span>
                           <div className='flex flex-wrap gap-2'>
+                            {MODEL_FETCHABLE_TYPES.has(currentType) && (
+                              <Button
+                                type='button'
+                                size='sm'
+                                onClick={handleFetchModels}
+                                disabled={isFetchingModels}
+                              >
+                                {isFetchingModels ? (
+                                  <Loader2
+                                    className='animate-spin'
+                                    data-icon='inline-start'
+                                  />
+                                ) : (
+                                  <Sparkles data-icon='inline-start' />
+                                )}
+                                {t('Fetch from Upstream')}
+                              </Button>
+                            )}
                             <Button
                               type='button'
                               variant='outline'
@@ -2544,22 +2656,6 @@ export function ChannelMutateDrawer({
                               <Plus className='mr-2 h-4 w-4' />
                               {t('Fill All Models')}
                             </Button>
-                            {MODEL_FETCHABLE_TYPES.has(currentType) && (
-                              <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={handleFetchModels}
-                                disabled={isFetchingModels}
-                              >
-                                {isFetchingModels ? (
-                                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                                ) : (
-                                  <Sparkles className='mr-2 h-4 w-4' />
-                                )}
-                                {t('Fetch from Upstream')}
-                              </Button>
-                            )}
                             <Button
                               type='button'
                               variant='outline'
@@ -2610,150 +2706,135 @@ export function ChannelMutateDrawer({
                   )}
                 />
 
-                {/* Custom Model Input */}
-                <div className='flex gap-2'>
-                  <Input
-                    placeholder={t('Add custom model(s), comma-separated')}
-                    value={customModel}
-                    onChange={(e) => setCustomModel(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddCustomModels()
-                      }
-                    }}
-                  />
-                  <Button
-                    type='button'
-                    variant='secondary'
-                    onClick={handleAddCustomModels}
-                    disabled={!customModel}
-                  >
-                    {t('Add')}
-                  </Button>
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name='model_mapping'
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className='flex items-center gap-2'>
-                        <FormLabel className='mb-0'>
-                          {t('Model Mapping')}
-                        </FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type='button'
-                                variant='ghost'
-                                size='icon-sm'
-                                className='text-muted-foreground hover:text-foreground size-auto p-0'
-                                aria-label='How model mapping works'
-                              />
-                            }
-                          >
-                            <HelpCircle className='h-4 w-4' />
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side='top'
-                            align='start'
-                            className='max-w-xs space-y-2 text-left'
-                          >
-                            <p className='text-xs font-semibold tracking-wide uppercase'>
-                              {t('Request flow')}
-                            </p>
-                            <div className='space-y-1 font-mono text-xs'>
-                              {mappingPreviewPairs.map((pair) => (
-                                <div
-                                  key={`${pair.source}-${pair.target}`}
-                                  className='flex items-center gap-1'
-                                >
-                                  <span>{pair.source}</span>
-                                  <ArrowRight className='h-3.5 w-3.5 opacity-70' />
-                                  <span>{pair.target}</span>
-                                </div>
-                              ))}
-                              {remainingMappingCount > 0 && (
-                                <div className='text-[11px] opacity-70'>
-                                  +{remainingMappingCount} {t('more mapping')}
-                                  {remainingMappingCount > 1 ? 's' : ''}
-                                </div>
-                              )}
-                            </div>
-                            <p className='text-[11px] leading-relaxed opacity-80'>
-                              {t(
-                                'Users call the model on the left. The platform forwards the request to the upstream model on the right.'
-                              )}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <ModelMappingEditor
-                          value={field.value || ''}
-                          onChange={field.onChange}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t(FIELD_DESCRIPTIONS.MODEL_MAPPING)}
-                      </FormDescription>
-                      {modelMappingGuardrail.invalidJson && (
-                        <Alert variant='destructive' className='mt-3'>
-                          <AlertDescription>
-                            {t('Model Mapping must be a JSON object like')}{' '}
-                            <code className='font-mono'>
-                              {'{"gpt-4":"Azure-GPT4"}'}
-                            </code>
-                            {t('. Please fix the JSON before saving.')}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      {modelMappingGuardrail.missingSourceModels.length > 0 && (
-                        <Alert className='mt-3 border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50'>
-                          <AlertDescription>
-                            {t('Add')}{' '}
-                            {formatModelNames(
-                              modelMappingGuardrail.missingSourceModels
-                            )}{' '}
-                            {t(
-                              'to the Models list so users can use them before the mapping sends traffic upstream.'
-                            )}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      <FormMessage />
-                    </FormItem>
+                <CompactSettingsCollapsible
+                  title={t('Groups & model replacement')}
+                  description={t(
+                    'Access groups and client-to-upstream model aliases'
                   )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='group'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Groups *')}</FormLabel>
-                      <FormControl>
-                        {isLoadingGroups ? (
-                          <Skeleton className='h-10 w-full' />
-                        ) : (
-                          <MultiSelect
-                            options={groupOptions}
-                            selected={field.value}
+                >
+                  <FormField
+                    control={form.control}
+                    name='model_mapping'
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className='flex items-center gap-2'>
+                          <FormLabel className='mb-0'>
+                            {t('Model Mapping')}
+                          </FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type='button'
+                                  variant='ghost'
+                                  size='icon-sm'
+                                  className='text-muted-foreground hover:text-foreground size-auto p-0'
+                                  aria-label='How model mapping works'
+                                />
+                              }
+                            >
+                              <HelpCircle className='h-4 w-4' />
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side='top'
+                              align='start'
+                              className='max-w-xs space-y-2 text-left'
+                            >
+                              <p className='text-xs font-semibold tracking-wide uppercase'>
+                                {t('Request flow')}
+                              </p>
+                              <div className='space-y-1 font-mono text-xs'>
+                                {mappingPreviewPairs.map((pair) => (
+                                  <div
+                                    key={`${pair.source}-${pair.target}`}
+                                    className='flex items-center gap-1'
+                                  >
+                                    <span>{pair.source}</span>
+                                    <ArrowRight className='h-3.5 w-3.5 opacity-70' />
+                                    <span>{pair.target}</span>
+                                  </div>
+                                ))}
+                                {remainingMappingCount > 0 && (
+                                  <div className='text-[11px] opacity-70'>
+                                    +{remainingMappingCount} {t('more mapping')}
+                                    {remainingMappingCount > 1 ? 's' : ''}
+                                  </div>
+                                )}
+                              </div>
+                              <p className='text-[11px] leading-relaxed opacity-80'>
+                                {t(
+                                  'Users call the model on the left. The platform forwards the request to the upstream model on the right.'
+                                )}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <ModelMappingEditor
+                            value={field.value || ''}
                             onChange={field.onChange}
-                            placeholder={t(FIELD_PLACEHOLDERS.GROUP)}
+                            disabled={isSubmitting}
                           />
+                        </FormControl>
+                        <FormDescription>
+                          {t(FIELD_DESCRIPTIONS.MODEL_MAPPING)}
+                        </FormDescription>
+                        {modelMappingGuardrail.invalidJson && (
+                          <Alert variant='destructive' className='mt-3'>
+                            <AlertDescription>
+                              {t('Model Mapping must be a JSON object like')}{' '}
+                              <code className='font-mono'>
+                                {'{"gpt-4":"Azure-GPT4"}'}
+                              </code>
+                              {t('. Please fix the JSON before saving.')}
+                            </AlertDescription>
+                          </Alert>
                         )}
-                      </FormControl>
-                      <FormDescription>
-                        {t(FIELD_DESCRIPTIONS.GROUP)}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        {modelMappingGuardrail.missingSourceModels.length >
+                          0 && (
+                          <Alert className='mt-3 border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50'>
+                            <AlertDescription>
+                              {t('Add')}{' '}
+                              {formatModelNames(
+                                modelMappingGuardrail.missingSourceModels
+                              )}{' '}
+                              {t(
+                                'to the Models list so users can use them before the mapping sends traffic upstream.'
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='group'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Groups *')}</FormLabel>
+                        <FormControl>
+                          {isLoadingGroups ? (
+                            <Skeleton className='h-10 w-full' />
+                          ) : (
+                            <MultiSelect
+                              options={groupOptions}
+                              selected={field.value}
+                              onChange={field.onChange}
+                              placeholder={t(FIELD_PLACEHOLDERS.GROUP)}
+                            />
+                          )}
+                        </FormControl>
+                        <FormDescription>
+                          {t(FIELD_DESCRIPTIONS.GROUP)}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CompactSettingsCollapsible>
               </div>
 
               <Collapsible

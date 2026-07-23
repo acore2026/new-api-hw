@@ -309,6 +309,7 @@ func InitResources() error {
 	}
 
 	perfmetrics.Init()
+	controller.InitChannelBenchmarkScheduler()
 
 	// 启动系统监控
 	common.StartSystemMonitor()

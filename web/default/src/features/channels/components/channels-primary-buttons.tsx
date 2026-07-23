@@ -18,9 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { DashboardSpeed01Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Plus,
   MoreHorizontal,
@@ -34,8 +31,6 @@ import {
   ArrowUpFromLine,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAuthStore } from '@/stores/auth-store'
-import { ROLE } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -59,9 +54,6 @@ import { useChannels } from './channels-provider'
 
 export function ChannelsPrimaryButtons() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const isSuperAdmin =
-    (useAuthStore((state) => state.auth.user?.role) || 0) >= ROLE.SUPER_ADMIN
   const {
     setOpen,
     setCurrentRow,
@@ -162,17 +154,6 @@ export function ChannelsPrimaryButtons() {
                 <TestTube className='h-4 w-4' />
               </DropdownMenuShortcut>
             </DropdownMenuItem>
-
-            {isSuperAdmin && (
-              <DropdownMenuItem
-                onClick={() => navigate({ to: '/channels/benchmark' })}
-              >
-                {t('Benchmark All Models')}
-                <DropdownMenuShortcut>
-                  <HugeiconsIcon icon={DashboardSpeed01Icon} strokeWidth={2} />
-                </DropdownMenuShortcut>
-              </DropdownMenuItem>
-            )}
 
             <DropdownMenuItem
               onClick={() => {

@@ -202,6 +202,7 @@ export interface ChannelBenchmarkResult {
 
 export interface ChannelBenchmarkJob {
   id: string
+  trigger: 'manual' | 'scheduled'
   status: ChannelBenchmarkStatus
   config: ChannelBenchmarkConfig
   total: number
@@ -218,6 +219,82 @@ export interface ChannelBenchmarkResponse {
   success: boolean
   message?: string
   data?: ChannelBenchmarkJob | null
+}
+
+export interface ChannelBenchmarkSchedule {
+  enabled: boolean
+  interval_minutes: number
+  retention_days: number
+  concurrency: number
+  timeout_seconds: number
+  max_tokens: number
+  prompt: string
+  enable_thinking: boolean
+  channel_ids: number[] | null
+  next_run_at: number
+  last_run_at: number
+  updated_at: number
+}
+
+export interface ChannelBenchmarkScheduleResponse {
+  success: boolean
+  message?: string
+  data?: ChannelBenchmarkSchedule
+}
+
+export interface ChannelBenchmarkTrendSummary {
+  samples: number
+  succeeded: number
+  failed: number
+  success_rate: number
+  average_tps: number
+  median_tps: number
+  p95_tps: number
+  average_ttft_ms: number
+  p95_ttft_ms: number
+  average_latency_ms: number
+  p95_latency_ms: number
+  output_tokens: number
+}
+
+export interface ChannelBenchmarkTrendRun {
+  id: string
+  trigger: 'manual' | 'scheduled'
+  status: ChannelBenchmarkStatus | 'interrupted'
+  total: number
+  completed: number
+  succeeded: number
+  failed: number
+  cancelled: number
+  started_at: number
+  completed_at: number
+}
+
+export interface ChannelBenchmarkTrendResult extends Omit<
+  ChannelBenchmarkResult,
+  'status'
+> {
+  id: number
+  run_id: string
+  trigger: 'manual' | 'scheduled'
+  recorded_at: number
+  status: ChannelBenchmarkResultStatus
+}
+
+export interface ChannelBenchmarkTrends {
+  hours: number
+  summary: ChannelBenchmarkTrendSummary
+  runs: ChannelBenchmarkTrendRun[]
+  results: ChannelBenchmarkTrendResult[]
+  models: string[]
+  channels: Array<{ id: number; name: string }>
+  truncated: boolean
+}
+
+export interface ChannelBenchmarkTrendsResponse {
+  success: boolean
+  message?: string
+  data?: ChannelBenchmarkTrends
 }
 
 export interface ChannelBalanceResponse {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,15 +26,22 @@ func getHeaderNavAccess(module string) headerNavAccess {
 	common.OptionMapRWMutex.RUnlock()
 
 	if strings.TrimSpace(raw) == "" {
-		return fallback
+		return applySelfUseHeaderNavAccess(module, fallback)
 	}
 
 	var parsed map[string]any
 	if err := common.Unmarshal([]byte(raw), &parsed); err != nil {
-		return fallback
+		return applySelfUseHeaderNavAccess(module, fallback)
 	}
 
-	return parseHeaderNavAccess(parsed[module], fallback)
+	return applySelfUseHeaderNavAccess(module, parseHeaderNavAccess(parsed[module], fallback))
+}
+
+func applySelfUseHeaderNavAccess(module string, access headerNavAccess) headerNavAccess {
+	if module == "pricing" && operation_setting.SelfUseModeEnabled {
+		access.Enabled = true
+	}
+	return access
 }
 
 func parseHeaderNavAccess(raw any, fallback headerNavAccess) headerNavAccess {

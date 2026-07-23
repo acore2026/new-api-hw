@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -93,6 +94,20 @@ func TestHeaderNavModuleAuthRejectsDisabledPricing(t *testing.T) {
 	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("pricing"), false)
 
 	require.Equal(t, http.StatusForbidden, recorder.Code)
+}
+
+func TestHeaderNavModuleAuthEnablesPricingInSelfUseMode(t *testing.T) {
+	raw := `{"pricing":{"enabled":false,"requireAuth":false}}`
+	withHeaderNavModules(t, raw)
+	previous := operation_setting.SelfUseModeEnabled
+	operation_setting.SelfUseModeEnabled = true
+	t.Cleanup(func() {
+		operation_setting.SelfUseModeEnabled = previous
+	})
+
+	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("pricing"), false)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
 }
 
 func TestHeaderNavModuleAuthRequiresLoginForPricing(t *testing.T) {

@@ -27,6 +27,9 @@ import type {
   ChannelTestResponse,
   ChannelBenchmarkConfig,
   ChannelBenchmarkResponse,
+  ChannelBenchmarkSchedule,
+  ChannelBenchmarkScheduleResponse,
+  ChannelBenchmarkTrendsResponse,
   CopyChannelParams,
   CopyChannelResponse,
   FetchModelsResponse,
@@ -292,6 +295,41 @@ export async function cancelChannelBenchmark(): Promise<ChannelBenchmarkResponse
   return res.data
 }
 
+export async function getChannelBenchmarkSchedule(): Promise<ChannelBenchmarkScheduleResponse> {
+  const res = await api.get(
+    '/api/channel/benchmark/schedule',
+    channelActionConfig()
+  )
+  return res.data
+}
+
+export async function updateChannelBenchmarkSchedule(
+  schedule: ChannelBenchmarkSchedule
+): Promise<ChannelBenchmarkScheduleResponse> {
+  const res = await api.put(
+    '/api/channel/benchmark/schedule',
+    schedule,
+    channelActionConfig()
+  )
+  return res.data
+}
+
+export async function getChannelBenchmarkTrends(params: {
+  hours: number
+  channelIds?: number[]
+  models?: string[]
+}): Promise<ChannelBenchmarkTrendsResponse> {
+  const res = await api.get('/api/channel/benchmark/trends', {
+    ...channelActionConfig(),
+    params: {
+      hours: params.hours,
+      channel_ids: params.channelIds?.join(',') || undefined,
+      models: params.models?.join(',') || undefined,
+    },
+  })
+  return res.data
+}
+
 /**
  * Update channel balance
  */
@@ -430,7 +468,7 @@ export async function startW3OAuth(
   settings?: W3OAuthSettingsPayload,
   channelId?: number
 ): Promise<W3OAuthStartResponse> {
-  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const config: ApiRequestConfig = { skipBusinessError: true }
   const url = channelId
     ? `/api/channel/${channelId}/w3/oauth/start`
     : '/api/channel/w3/oauth/start'
@@ -441,7 +479,7 @@ export async function startW3OAuth(
 export async function completeW3OAuth(
   channelId?: number
 ): Promise<W3OAuthCompleteResponse> {
-  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const config: ApiRequestConfig = { skipBusinessError: true }
   const url = channelId
     ? `/api/channel/${channelId}/w3/oauth/complete`
     : '/api/channel/w3/oauth/complete'
@@ -452,7 +490,7 @@ export async function completeW3OAuth(
 export async function refreshW3Credential(
   channelId: number
 ): Promise<W3CredentialRefreshResponse> {
-  const config: ExtendedApiConfig = { skipBusinessError: true }
+  const config: ApiRequestConfig = { skipBusinessError: true }
   const res = await api.post(`/api/channel/${channelId}/w3/refresh`, {}, config)
   return res.data
 }

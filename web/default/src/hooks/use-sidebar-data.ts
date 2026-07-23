@@ -16,6 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { createElement } from 'react'
+import {
+  ChartLineData01Icon,
+  DashboardSpeed01Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Activity,
   Box,
@@ -34,7 +40,17 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE } from '@/lib/roles'
 import { type SidebarData } from '@/components/layout/types'
+
+function BenchmarkIcon(props: { className?: string }) {
+  return createElement(HugeiconsIcon, { icon: DashboardSpeed01Icon, ...props })
+}
+
+function TrendIcon(props: { className?: string }) {
+  return createElement(HugeiconsIcon, { icon: ChartLineData01Icon, ...props })
+}
 
 /**
  * Root navigation groups for the application sidebar.
@@ -44,6 +60,7 @@ import { type SidebarData } from '@/components/layout/types'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const role = useAuthStore((state) => state.auth.user?.role ?? ROLE.GUEST)
 
   return {
     navGroups: [
@@ -121,6 +138,27 @@ export function useSidebarData(): SidebarData {
             url: '/channels',
             icon: Radio,
           },
+          ...(role >= ROLE.SUPER_ADMIN
+            ? [
+                {
+                  title: t('Benchmarks'),
+                  icon: BenchmarkIcon,
+                  activeUrls: ['/benchmarks'],
+                  items: [
+                    {
+                      title: t('Run benchmark'),
+                      url: '/benchmarks',
+                      icon: BenchmarkIcon,
+                    },
+                    {
+                      title: t('Benchmark trends'),
+                      url: '/benchmarks/trends',
+                      icon: TrendIcon,
+                    },
+                  ],
+                },
+              ]
+            : []),
           {
             title: t('Models'),
             url: '/models/metadata',

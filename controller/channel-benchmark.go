@@ -56,6 +56,7 @@ type channelBenchmarkResult struct {
 
 type channelBenchmarkJob struct {
 	ID          string                   `json:"id"`
+	Trigger     string                   `json:"trigger"`
 	Status      string                   `json:"status"`
 	Config      channelBenchmarkConfig   `json:"config"`
 	Total       int                      `json:"total"`
@@ -119,26 +120,49 @@ func StartChannelBenchmark(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	snapshot, err := startChannelBenchmark(config, testUserID, "manual")
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, snapshot)
+}
+
+func startChannelBenchmark(
+	config channelBenchmarkConfig,
+	testUserID int,
+	trigger string,
+) (*channelBenchmarkJob, error) {
+	if err := validateChannelBenchmarkConfig(config); err != nil {
+		return nil, err
+	}
+
+	channelBenchmarkState.Lock()
+	if channelBenchmarkState.job != nil &&
+		(channelBenchmarkState.job.Status == "running" || channelBenchmarkState.job.Status == "cancelling") {
+		channelBenchmarkState.Unlock()
+		return nil, errors.New("a channel benchmark is already running")
+	}
+	channelBenchmarkState.Unlock()
+
 	channels, err := model.GetAllChannels(0, 0, true, false)
 	if err != nil {
-		common.ApiError(c, err)
-		return
+		return nil, err
 	}
 	channels, config.ChannelIDs = selectChannelBenchmarkChannels(channels, config.ChannelIDs)
 	if len(channels) == 0 {
-		common.ApiErrorMsg(c, "no channels selected for benchmark")
-		return
+		return nil, errors.New("no channels selected for benchmark")
 	}
 
 	work, results := buildChannelBenchmarkWork(channels)
 	if len(results) == 0 {
-		common.ApiErrorMsg(c, "no configured channel models to benchmark")
-		return
+		return nil, errors.New("no configured channel models to benchmark")
 	}
 
 	jobContext, cancel := context.WithCancel(context.Background())
 	job := &channelBenchmarkJob{
 		ID:        common.GetUUID(),
+		Trigger:   trigger,
 		Status:    "running",
 		Config:    config,
 		Total:     len(results),
@@ -146,23 +170,44 @@ func StartChannelBenchmark(c *gin.Context) {
 		Results:   results,
 		cancel:    cancel,
 	}
+	configData, err := common.Marshal(config)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 
 	channelBenchmarkState.Lock()
 	if channelBenchmarkState.job != nil &&
 		(channelBenchmarkState.job.Status == "running" || channelBenchmarkState.job.Status == "cancelling") {
 		channelBenchmarkState.Unlock()
 		cancel()
-		common.ApiErrorMsg(c, "a channel benchmark is already running")
-		return
+		return nil, errors.New("a channel benchmark is already running")
 	}
 	channelBenchmarkState.job = job
 	snapshot := cloneChannelBenchmarkJob(job)
 	channelBenchmarkState.Unlock()
 
+	if err := model.CreateChannelBenchmarkRun(&model.ChannelBenchmarkRun{
+		Id:        job.ID,
+		Trigger:   trigger,
+		Status:    job.Status,
+		Config:    string(configData),
+		Total:     job.Total,
+		StartedAt: job.StartedAt,
+	}); err != nil {
+		channelBenchmarkState.Lock()
+		if channelBenchmarkState.job != nil && channelBenchmarkState.job.ID == job.ID {
+			channelBenchmarkState.job = nil
+		}
+		channelBenchmarkState.Unlock()
+		cancel()
+		return nil, fmt.Errorf("failed to create benchmark run: %w", err)
+	}
+
 	gopool.Go(func() {
 		runChannelBenchmark(jobContext, job.ID, testUserID, work, config)
 	})
-	common.ApiSuccess(c, snapshot)
+	return snapshot, nil
 }
 
 func GetChannelBenchmark(c *gin.Context) {
@@ -428,9 +473,9 @@ func recordChannelBenchmarkResult(jobID string, index int, result channelBenchma
 
 func finishChannelBenchmark(jobID string, cancelled bool) {
 	channelBenchmarkState.Lock()
-	defer channelBenchmarkState.Unlock()
 	job := channelBenchmarkState.job
 	if job == nil || job.ID != jobID {
+		channelBenchmarkState.Unlock()
 		return
 	}
 	if cancelled {
@@ -447,6 +492,9 @@ func finishChannelBenchmark(jobID string, cancelled bool) {
 	}
 	job.CompletedAt = time.Now().UnixMilli()
 	job.cancel = nil
+	snapshot := cloneChannelBenchmarkJob(job)
+	channelBenchmarkState.Unlock()
+	persistChannelBenchmarkJob(snapshot)
 }
 
 func cloneChannelBenchmarkJob(job *channelBenchmarkJob) *channelBenchmarkJob {
@@ -457,4 +505,46 @@ func cloneChannelBenchmarkJob(job *channelBenchmarkJob) *channelBenchmarkJob {
 	clone.Results = append([]channelBenchmarkResult(nil), job.Results...)
 	clone.cancel = nil
 	return &clone
+}
+
+func persistChannelBenchmarkJob(job *channelBenchmarkJob) {
+	if job == nil {
+		return
+	}
+	run := &model.ChannelBenchmarkRun{
+		Id:          job.ID,
+		Trigger:     job.Trigger,
+		Status:      job.Status,
+		Total:       job.Total,
+		Completed:   job.Completed,
+		Succeeded:   job.Succeeded,
+		Failed:      job.Failed,
+		Cancelled:   job.Cancelled,
+		StartedAt:   job.StartedAt,
+		CompletedAt: job.CompletedAt,
+	}
+	results := make([]model.ChannelBenchmarkResult, 0, len(job.Results))
+	for _, result := range job.Results {
+		results = append(results, model.ChannelBenchmarkResult{
+			RunId:           job.ID,
+			Trigger:         job.Trigger,
+			RecordedAt:      job.CompletedAt / 1000,
+			ChannelId:       result.ChannelID,
+			ChannelName:     result.ChannelName,
+			ChannelType:     result.ChannelType,
+			ChannelTypeName: result.ChannelTypeName,
+			Model:           result.Model,
+			Status:          result.Status,
+			Stream:          result.Stream,
+			TotalLatencyMs:  result.TotalLatencyMs,
+			TtftMs:          result.TTFTMs,
+			OutputTokens:    result.OutputTokens,
+			Tps:             result.TPS,
+			Error:           result.Error,
+			ErrorCode:       result.ErrorCode,
+		})
+	}
+	if err := model.CompleteChannelBenchmarkRun(run, results); err != nil {
+		common.SysError("failed to persist channel benchmark: " + err.Error())
+	}
 }

@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
-  ArrowLeft01Icon,
+  ChartLineData01Icon,
   DashboardSpeed01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -331,9 +331,12 @@ export function ChannelBenchmark() {
         {t('Channel Model Benchmark')}
       </SectionPageLayout.Title>
       <SectionPageLayout.Actions>
-        <Button variant='outline' onClick={() => navigate({ to: '/channels' })}>
-          <HugeiconsIcon icon={ArrowLeft01Icon} data-icon='inline-start' />
-          {t('Back to Channels')}
+        <Button
+          variant='outline'
+          onClick={() => navigate({ to: '/benchmarks/trends' })}
+        >
+          <HugeiconsIcon icon={ChartLineData01Icon} data-icon='inline-start' />
+          {t('View trends')}
         </Button>
         {primaryAction}
       </SectionPageLayout.Actions>

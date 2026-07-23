@@ -139,7 +139,11 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
 export function parseHeaderNavModulesFromStatus(
   status: Record<string, unknown> | null
 ): HeaderNavModules {
-  return parseHeaderNavModules(status?.HeaderNavModules)
+  const modules = parseHeaderNavModules(status?.HeaderNavModules)
+  if (parseHeaderNavBoolean(status?.self_use_mode_enabled, false)) {
+    modules.pricing.enabled = true
+  }
+  return modules
 }
 
 function getCachedStatus(): Record<string, unknown> | null {
