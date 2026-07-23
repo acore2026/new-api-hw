@@ -80,6 +80,7 @@ import {
   Package,
   Server,
   CalendarClock,
+  Bot,
 } from 'lucide-react';
 import {
   SiAtlassian,
@@ -381,8 +382,8 @@ export function getChannelIcon(channelType) {
       return <Hunyuan.Color size={iconSize} />;
     case 31: // 零一万物
       return <Yi.Color size={iconSize} />;
-    case 35: // MiniMax
-      return <Minimax.Color size={iconSize} />;
+    case 35: // CodeAgent
+      return <Bot size={iconSize} />;
     case 37: // Dify
       return <Dify.Color size={iconSize} />;
     case 38: // Jina

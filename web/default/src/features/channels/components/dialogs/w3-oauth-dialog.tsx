@@ -164,7 +164,7 @@ export function W3OAuthDialog({
         <DialogHeader>
           <DialogTitle>{t('Huawei W3 Authorization')}</DialogTitle>
           <DialogDescription>
-            {t('Generate a W3 OAuth credential for this MiniMax channel.')}
+            {t('Generate a W3 OAuth credential for this CodeAgent channel.')}
           </DialogDescription>
         </DialogHeader>
 

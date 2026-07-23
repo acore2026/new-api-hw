@@ -53,7 +53,7 @@ export const CHANNEL_TYPES = {
   31: 'LingYiWanWu',
   33: 'AWS',
   34: 'Cohere',
-  35: 'MiniMax',
+  35: 'CodeAgent',
   36: 'SunoAPI',
   37: 'Dify',
   38: 'Jina',

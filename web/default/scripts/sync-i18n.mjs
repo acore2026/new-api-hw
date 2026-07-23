@@ -44,6 +44,7 @@ const BRAND_AND_LITERAL_KEYS = new Set([
   'Client ID',
   'Client Secret',
   'Cloudflare',
+  'CodeAgent',
   'Cohere',
   'DeepSeek',
   'Discord',
@@ -316,5 +317,4 @@ main().catch((err) => {
   console.error(err)
   process.exitCode = 1
 })
-
 

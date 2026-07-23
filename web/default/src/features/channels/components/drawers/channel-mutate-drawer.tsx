@@ -52,7 +52,6 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useHiddenClickUnlock } from '@/hooks/use-hidden-click-unlock'
@@ -138,7 +137,6 @@ import {
   transformFormDataToUpdatePayload,
   type ChannelFormValues,
   deduplicateKeys,
-  getChannelTypeIcon,
   getKeyPromptForType,
   parseModelsString,
   formatModelsArray,
@@ -153,6 +151,7 @@ import {
   collectNewDisallowedStatusCodeRedirects,
 } from '../../lib/status-code-risk-guard'
 import type { Channel } from '../../types'
+import { ChannelTypeIcon } from '../channel-type-icon'
 import { useChannels } from '../channels-provider'
 import { CodexOAuthDialog } from '../dialogs/codex-oauth-dialog'
 import { FetchModelsDialog } from '../dialogs/fetch-models-dialog'
@@ -484,13 +483,13 @@ export function ChannelMutateDrawer({
     const options = CHANNEL_TYPE_OPTIONS.map((option) => ({
       value: String(option.value),
       label: t(option.label),
-      icon: getLobeIcon(`${getChannelTypeIcon(option.value)}.Color`, 16),
+      icon: <ChannelTypeIcon type={option.value} size={16} />,
     }))
     if (!options.some((option) => Number(option.value) === currentType)) {
       options.push({
         value: String(currentType),
         label: `#${currentType}`,
-        icon: getLobeIcon(`${getChannelTypeIcon(currentType)}.Color`, 16),
+        icon: <ChannelTypeIcon type={currentType} size={16} />,
       })
     }
     return options
@@ -1162,7 +1161,7 @@ export function ChannelMutateDrawer({
           <SheetHeader className='border-b px-4 py-3 text-start sm:px-6 sm:py-4'>
             <SheetTitle className='flex items-center gap-3'>
               <span className='bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border'>
-                {getLobeIcon(`${getChannelTypeIcon(currentType)}.Color`, 22)}
+                <ChannelTypeIcon type={currentType} size={22} />
               </span>
               <span>
                 {isEditing ? t('Edit Channel') : t('Create Channel')}
@@ -1493,7 +1492,7 @@ export function ChannelMutateDrawer({
                   />
                 )}
 
-                {/* MiniMax W3 OAuth (type 35) */}
+                {/* CodeAgent W3 OAuth (type 35) */}
                 {currentType === 35 && (
                   <div className='space-y-4'>
                     <FormField
@@ -1505,7 +1504,7 @@ export function ChannelMutateDrawer({
                             <FormLabel>{t('Huawei W3 OAuth')}</FormLabel>
                             <FormDescription>
                               {t(
-                                'Use Huawei W3 SSO credentials for MiniMax chat completions.'
+                                'Use Huawei W3 SSO credentials for CodeAgent chat completions.'
                               )}
                             </FormDescription>
                           </div>
@@ -2269,7 +2268,7 @@ export function ChannelMutateDrawer({
                         </div>
                         <div className='text-muted-foreground text-xs'>
                           {t(
-                            'W3 MiniMax channels use an OAuth JSON credential as the key.'
+                            'W3 CodeAgent channels use an OAuth JSON credential as the key.'
                           )}
                         </div>
                       </div>

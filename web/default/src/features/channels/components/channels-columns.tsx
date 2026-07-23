@@ -35,7 +35,6 @@ import {
   formatTimestampToDate,
   formatQuota as formatQuotaValue,
 } from '@/lib/format'
-import { getLobeIcon } from '@/lib/lobe-icon'
 import { truncateText } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -58,7 +57,6 @@ import {
   formatRelativeTime,
   formatResponseTime,
   getBalanceVariant,
-  getChannelTypeIcon,
   getChannelTypeLabel,
   getResponseTimeConfig,
   isMultiKeyChannel,
@@ -73,6 +71,7 @@ import {
 } from '../lib'
 import { parseUpstreamUpdateMeta } from '../lib/upstream-update-utils'
 import type { Channel } from '../types'
+import { ChannelTypeIcon } from './channel-type-icon'
 import { useChannels } from './channels-provider'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DataTableTagRowActions } from './data-table-tag-row-actions'
@@ -622,8 +621,7 @@ export function useChannelsColumns(): ColumnDef<Channel>[] {
         const type = row.getValue('type') as number
         const typeNameKey = getChannelTypeLabel(type)
         const typeName = t(typeNameKey)
-        const iconName = getChannelTypeIcon(type)
-        const icon = getLobeIcon(`${iconName}.Color`, 14)
+        const icon = <ChannelTypeIcon type={type} size={14} />
         const channel = row.original as Channel
         const isMultiKey = isMultiKeyChannel(channel)
         const multiKeyMode = channel.channel_info?.multi_key_mode ?? 'random'
