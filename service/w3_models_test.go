@@ -30,7 +30,17 @@ func TestFetchW3ModelsUsesUserDetailHeaders(t *testing.T) {
 				r.Header.Get("x-agent-user-department") != "075774/031562" {
 				t.Fatalf("unexpected model request headers: %v", r.Header)
 			}
-			_, _ = w.Write([]byte(`[{"name":"MiniMax-M2.7","modelId":"MiniMax-M2.7"},{"name":"GLM Auto","modelId":"GLM-5.1-CodeAgent-Auto"}]`))
+			_, _ = w.Write([]byte(`[
+				{"name":"MiniMax-M2.7","modelId":"MiniMax-M2.7"},
+				{
+					"name":"GLM Auto",
+					"modelId":"GLM-5.1-CodeAgent-Auto",
+					"routModels":[
+						{"name":"GLM-5.1-CodeAgent","modelId":"GLM-5.1-CodeAgent"},
+						{"name":"Qwen3.6-27B-VL","modelId":"Qwen3.6-27B-VL"}
+					]
+				}
+			]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -49,7 +59,10 @@ func TestFetchW3ModelsUsesUserDetailHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchW3Models returned error: %v", err)
 	}
-	if len(models) != 2 || models[0] != "MiniMax-M2.7" || models[1] != "GLM-5.1-CodeAgent-Auto" {
+	if len(models) != 3 ||
+		models[0] != "MiniMax-M2.7" ||
+		models[1] != "GLM-5.1-CodeAgent" ||
+		models[2] != "Qwen3.6-27B-VL" {
 		t.Fatalf("models = %#v", models)
 	}
 }

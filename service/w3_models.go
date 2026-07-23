@@ -33,8 +33,9 @@ type w3UserDetailResponse struct {
 }
 
 type w3Model struct {
-	Name    string `json:"name"`
-	ModelID string `json:"modelId"`
+	Name        string    `json:"name"`
+	ModelID     string    `json:"modelId"`
+	RouteModels []w3Model `json:"routModels"`
 }
 
 // FetchW3Models resolves the account metadata required by CodeAgent before
@@ -97,23 +98,34 @@ func FetchW3Models(
 	modelIDs := make([]string, 0, len(response))
 	seen := make(map[string]struct{}, len(response))
 	for _, item := range response {
-		modelID := strings.TrimSpace(item.ModelID)
-		if modelID == "" {
-			modelID = strings.TrimSpace(item.Name)
-		}
-		if modelID == "" {
-			continue
-		}
-		if _, ok := seen[modelID]; ok {
-			continue
-		}
-		seen[modelID] = struct{}{}
-		modelIDs = append(modelIDs, modelID)
+		appendW3ModelIDs(item, seen, &modelIDs)
 	}
 	if len(modelIDs) == 0 {
 		return nil, errors.New("model list response contained no model IDs")
 	}
 	return modelIDs, nil
+}
+
+func appendW3ModelIDs(item w3Model, seen map[string]struct{}, modelIDs *[]string) {
+	if len(item.RouteModels) > 0 {
+		for _, routeModel := range item.RouteModels {
+			appendW3ModelIDs(routeModel, seen, modelIDs)
+		}
+		return
+	}
+
+	modelID := strings.TrimSpace(item.ModelID)
+	if modelID == "" {
+		modelID = strings.TrimSpace(item.Name)
+	}
+	if modelID == "" {
+		return
+	}
+	if _, ok := seen[modelID]; ok {
+		return
+	}
+	seen[modelID] = struct{}{}
+	*modelIDs = append(*modelIDs, modelID)
 }
 
 func fetchW3UserDetail(
