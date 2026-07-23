@@ -29,8 +29,6 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslation } from 'react-i18next'
 import {
-  Area,
-  AreaChart,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -53,6 +51,8 @@ import {
 } from '@/components/ui/card'
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -123,14 +123,23 @@ const DEFAULT_SCHEDULE: ChannelBenchmarkSchedule = {
   updated_at: 0,
 }
 
-type TrendPoint = {
-  ts: number
-  tps: number
-  ttft: number
-  latency: number
-  successRate: number
-  outputTokens: number
-  samples: number
+const CHART_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+] as const
+
+type TrendPoint = { ts: number } & Record<string, number | undefined>
+
+type TrendSeries = {
+  id: string
+  key: string
+  channel: string
+  model: string
+  label: string
+  color: string
 }
 
 type EntityRollup = {
@@ -191,37 +200,78 @@ function summarize(results: ChannelBenchmarkTrendResult[]) {
   } satisfies ChannelBenchmarkTrendSummary
 }
 
-function buildTrendPoints(results: ChannelBenchmarkTrendResult[]) {
-  const buckets = new Map<number, ChannelBenchmarkTrendResult[]>()
+function buildTrendSeries(results: ChannelBenchmarkTrendResult[]) {
+  const seriesByKey = new Map<
+    string,
+    Omit<TrendSeries, 'id' | 'color' | 'label'>
+  >()
   for (const result of results) {
-    const current = buckets.get(result.recorded_at) ?? []
-    current.push(result)
-    buckets.set(result.recorded_at, current)
+    const key = `${result.channel_id}:${result.model}`
+    if (!seriesByKey.has(key)) {
+      seriesByKey.set(key, {
+        key,
+        channel: result.channel_name,
+        model: result.model,
+      })
+    }
   }
-  return Array.from(buckets.entries())
+
+  const series = Array.from(seriesByKey.values())
+    .sort(
+      (a, b) =>
+        a.channel.localeCompare(b.channel) || a.model.localeCompare(b.model)
+    )
+    .map(
+      (item, index): TrendSeries => ({
+        ...item,
+        id: `series${index}`,
+        label: `${item.channel} / ${item.model}`,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      })
+    )
+  const seriesLookup = new Map(series.map((item) => [item.key, item]))
+  const buckets = new Map<number, Map<string, ChannelBenchmarkTrendResult[]>>()
+  for (const result of results) {
+    const key = `${result.channel_id}:${result.model}`
+    const timestampBucket =
+      buckets.get(result.recorded_at) ??
+      new Map<string, ChannelBenchmarkTrendResult[]>()
+    const entityBucket = timestampBucket.get(key) ?? []
+    entityBucket.push(result)
+    timestampBucket.set(key, entityBucket)
+    buckets.set(result.recorded_at, timestampBucket)
+  }
+
+  const points = Array.from(buckets.entries())
     .sort(([a], [b]) => a - b)
-    .map(([ts, bucket]): TrendPoint => {
-      const successful = bucket.filter((result) => result.status === 'success')
-      const tps = successful
-        .map((result) => result.tps)
-        .filter((value): value is number => typeof value === 'number')
-      const ttft = successful
-        .map((result) => result.ttft_ms)
-        .filter((value): value is number => typeof value === 'number')
-      return {
-        ts,
-        tps: average(tps),
-        ttft: average(ttft),
-        latency: average(successful.map((result) => result.total_latency_ms)),
-        successRate:
-          bucket.length > 0 ? (successful.length / bucket.length) * 100 : 0,
-        outputTokens: bucket.reduce(
+    .map(([ts, timestampBucket]): TrendPoint => {
+      const point: TrendPoint = { ts }
+      for (const [key, rows] of timestampBucket) {
+        const entity = seriesLookup.get(key)
+        if (!entity) continue
+        const successful = rows.filter((result) => result.status === 'success')
+        const tps = successful
+          .map((result) => result.tps)
+          .filter((value): value is number => typeof value === 'number')
+        const ttft = successful
+          .map((result) => result.ttft_ms)
+          .filter((value): value is number => typeof value === 'number')
+        point[`tps_${entity.id}`] = tps.length ? average(tps) : undefined
+        point[`ttft_${entity.id}`] = ttft.length ? average(ttft) : undefined
+        point[`latency_${entity.id}`] = successful.length
+          ? average(successful.map((result) => result.total_latency_ms))
+          : undefined
+        point[`success_${entity.id}`] =
+          rows.length > 0 ? (successful.length / rows.length) * 100 : undefined
+        point[`tokens_${entity.id}`] = rows.reduce(
           (sum, result) => sum + result.output_tokens,
           0
-        ),
-        samples: bucket.length,
+        )
       }
+      return point
     })
+
+  return { points, series }
 }
 
 function buildEntityRollups(results: ChannelBenchmarkTrendResult[]) {
@@ -317,26 +367,6 @@ export function BenchmarkTrends() {
   const [selectedModel, setSelectedModel] = useState('all')
   const [draftOverride, setDraftOverride] =
     useState<ChannelBenchmarkSchedule | null>(null)
-  const chartConfig = useMemo(
-    () =>
-      ({
-        tps: { label: 'TPS', color: 'var(--chart-1)' },
-        ttft: { label: 'TTFT', color: 'var(--chart-2)' },
-        latency: {
-          label: t('Total latency'),
-          color: 'var(--chart-3)',
-        },
-        successRate: {
-          label: t('Success rate'),
-          color: 'var(--chart-4)',
-        },
-        outputTokens: {
-          label: t('Output tokens'),
-          color: 'var(--chart-5)',
-        },
-      }) satisfies ChartConfig,
-    [t]
-  )
 
   const channelsQuery = useQuery({
     queryKey: ['channels', 'benchmark-schedule'],
@@ -430,10 +460,39 @@ export function BenchmarkTrends() {
     [allResults, selectedChannel, selectedModel]
   )
   const summary = useMemo(() => summarize(filteredResults), [filteredResults])
-  const points = useMemo(
-    () => buildTrendPoints(filteredResults),
+  const trendData = useMemo(
+    () => buildTrendSeries(filteredResults),
     [filteredResults]
   )
+  const { points, series } = trendData
+  const chartConfigs = useMemo(() => {
+    const throughput: ChartConfig = {}
+    const latency: ChartConfig = {}
+    const reliability: ChartConfig = {}
+    for (const item of series) {
+      throughput[`tps_${item.id}`] = {
+        label: item.label,
+        color: item.color,
+      }
+      latency[`latency_${item.id}`] = {
+        label: `${item.label} · ${t('Total latency')}`,
+        color: item.color,
+      }
+      latency[`ttft_${item.id}`] = {
+        label: `${item.label} · TTFT`,
+        color: item.color,
+      }
+      reliability[`success_${item.id}`] = {
+        label: item.label,
+        color: item.color,
+      }
+      reliability[`tokens_${item.id}`] = {
+        label: `${item.label} · ${t('Output tokens')}`,
+        color: item.color,
+      }
+    }
+    return { throughput, latency, reliability }
+  }, [series, t])
   const entities = useMemo(
     () => buildEntityRollups(filteredResults),
     [filteredResults]
@@ -655,34 +714,14 @@ export function BenchmarkTrends() {
                   <TrendChartCard
                     title={t('Throughput timeline')}
                     description={t(
-                      'Average generated tokens per second for each benchmark run'
+                      'Generated tokens per second for each channel and model'
                     )}
                   >
                     <ChartContainer
-                      config={chartConfig}
+                      config={chartConfigs.throughput}
                       className='h-72 w-full'
                     >
-                      <AreaChart data={points}>
-                        <defs>
-                          <linearGradient
-                            id='benchmark-tps'
-                            x1='0'
-                            y1='0'
-                            x2='0'
-                            y2='1'
-                          >
-                            <stop
-                              offset='5%'
-                              stopColor='var(--color-tps)'
-                              stopOpacity={0.38}
-                            />
-                            <stop
-                              offset='95%'
-                              stopColor='var(--color-tps)'
-                              stopOpacity={0.02}
-                            />
-                          </linearGradient>
-                        </defs>
+                      <LineChart data={points}>
                         <CartesianGrid vertical={false} strokeDasharray='3 3' />
                         <XAxis
                           dataKey='ts'
@@ -706,26 +745,35 @@ export function BenchmarkTrends() {
                             />
                           }
                         />
-                        <Area
-                          type='monotone'
-                          dataKey='tps'
-                          stroke='var(--color-tps)'
-                          fill='url(#benchmark-tps)'
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
+                        <ChartLegend
+                          content={
+                            <ChartLegendContent className='flex-wrap justify-start gap-x-3 gap-y-1' />
+                          }
                         />
-                      </AreaChart>
+                        {series.map((item) => (
+                          <Line
+                            key={item.key}
+                            type='monotone'
+                            dataKey={`tps_${item.id}`}
+                            stroke={`var(--color-tps_${item.id})`}
+                            strokeWidth={2}
+                            dot={{ r: 2 }}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                          />
+                        ))}
+                      </LineChart>
                     </ChartContainer>
                   </TrendChartCard>
 
                   <TrendChartCard
                     title={t('Latency envelope')}
                     description={t(
-                      'First-token delay compared with full request latency'
+                      'First-token and total latency for each channel and model'
                     )}
                   >
                     <ChartContainer
-                      config={chartConfig}
+                      config={chartConfigs.latency}
                       className='h-72 w-full'
                     >
                       <LineChart data={points}>
@@ -756,20 +804,34 @@ export function BenchmarkTrends() {
                             />
                           }
                         />
-                        <Line
-                          type='monotone'
-                          dataKey='ttft'
-                          stroke='var(--color-ttft)'
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
+                        <ChartLegend
+                          content={
+                            <ChartLegendContent className='flex-wrap justify-start gap-x-3 gap-y-1' />
+                          }
                         />
-                        <Line
-                          type='monotone'
-                          dataKey='latency'
-                          stroke='var(--color-latency)'
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
-                        />
+                        {series.flatMap((item) => [
+                          <Line
+                            key={`${item.key}:latency`}
+                            type='monotone'
+                            dataKey={`latency_${item.id}`}
+                            stroke={`var(--color-latency_${item.id})`}
+                            strokeWidth={2}
+                            dot={{ r: 2 }}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                          />,
+                          <Line
+                            key={`${item.key}:ttft`}
+                            type='monotone'
+                            dataKey={`ttft_${item.id}`}
+                            stroke={`var(--color-ttft_${item.id})`}
+                            strokeWidth={2}
+                            strokeDasharray='4 3'
+                            dot={false}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                          />,
+                        ])}
                       </LineChart>
                     </ChartContainer>
                   </TrendChartCard>
@@ -777,11 +839,11 @@ export function BenchmarkTrends() {
                   <TrendChartCard
                     title={t('Reliability and workload')}
                     description={t(
-                      'Success percentage and generated output volume per run'
+                      'Success and output volume for each channel and model'
                     )}
                   >
                     <ChartContainer
-                      config={chartConfig}
+                      config={chartConfigs.reliability}
                       className='h-72 w-full'
                     >
                       <ComposedChart data={points}>
@@ -817,21 +879,33 @@ export function BenchmarkTrends() {
                             />
                           }
                         />
-                        <Bar
-                          yAxisId='tokens'
-                          dataKey='outputTokens'
-                          fill='var(--color-outputTokens)'
-                          opacity={0.32}
-                          radius={[4, 4, 0, 0]}
+                        <ChartLegend
+                          content={
+                            <ChartLegendContent className='flex-wrap justify-start gap-x-3 gap-y-1' />
+                          }
                         />
-                        <Line
-                          yAxisId='rate'
-                          type='monotone'
-                          dataKey='successRate'
-                          stroke='var(--color-successRate)'
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
-                        />
+                        {series.flatMap((item) => [
+                          <Bar
+                            key={`${item.key}:tokens`}
+                            yAxisId='tokens'
+                            dataKey={`tokens_${item.id}`}
+                            fill={`var(--color-tokens_${item.id})`}
+                            opacity={0.24}
+                            radius={[3, 3, 0, 0]}
+                            isAnimationActive={false}
+                          />,
+                          <Line
+                            key={`${item.key}:success`}
+                            yAxisId='rate'
+                            type='monotone'
+                            dataKey={`success_${item.id}`}
+                            stroke={`var(--color-success_${item.id})`}
+                            strokeWidth={2}
+                            dot={{ r: 2 }}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                          />,
+                        ])}
                       </ComposedChart>
                     </ChartContainer>
                   </TrendChartCard>
