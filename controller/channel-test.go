@@ -57,6 +57,7 @@ type channelTestOptions struct {
 	context         context.Context
 	prompt          string
 	maxOutputTokens uint
+	enableThinking  bool
 	logLabel        string
 }
 
@@ -589,6 +590,10 @@ func applyChannelTestOptions(request dto.Request, options channelTestOptions) er
 				req.MaxTokens = lo.ToPtr(options.maxOutputTokens)
 			}
 		}
+		if options.enableThinking {
+			req.ReasoningEffort = "high"
+			req.EnableThinking = json.RawMessage(`true`)
+		}
 	case *dto.OpenAIResponsesRequest:
 		if prompt := strings.TrimSpace(options.prompt); prompt != "" {
 			input, err := common.Marshal([]map[string]any{{
@@ -602,6 +607,13 @@ func applyChannelTestOptions(request dto.Request, options channelTestOptions) er
 		}
 		if options.maxOutputTokens > 0 {
 			req.MaxOutputTokens = lo.ToPtr(options.maxOutputTokens)
+		}
+		if options.enableThinking {
+			req.Reasoning = &dto.Reasoning{
+				Effort:  "high",
+				Summary: "auto",
+			}
+			req.EnableThinking = json.RawMessage(`true`)
 		}
 	}
 	return nil

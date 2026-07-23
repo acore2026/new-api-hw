@@ -150,6 +150,31 @@ export async function getChannels(
   return res.data
 }
 
+export async function getAllChannels(): Promise<Channel[]> {
+  const pageSize = 100
+  const firstPage = await getChannels({ p: 1, page_size: pageSize })
+  if (!firstPage.success || !firstPage.data) {
+    throw new Error(firstPage.message || 'Failed to load channels')
+  }
+
+  const channels = [...firstPage.data.items]
+  const pageCount = Math.ceil(firstPage.data.total / pageSize)
+  if (pageCount <= 1) return channels
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      getChannels({ p: index + 2, page_size: pageSize })
+    )
+  )
+  for (const page of remainingPages) {
+    if (!page.success || !page.data) {
+      throw new Error(page.message || 'Failed to load channels')
+    }
+    channels.push(...page.data.items)
+  }
+  return channels
+}
+
 /**
  * Search channels with filters
  */

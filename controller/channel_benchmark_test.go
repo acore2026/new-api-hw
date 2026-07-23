@@ -53,3 +53,43 @@ func TestBuildChannelTestMetricsCalculatesTTFTAndTPS(t *testing.T) {
 		t.Fatalf("tps = %v, want 20", metrics.tps)
 	}
 }
+
+func TestApplyChannelTestOptionsSetsPromptAndThinking(t *testing.T) {
+	request := &dto.GeneralOpenAIRequest{
+		Messages: []dto.Message{{Role: "user", Content: "old prompt"}},
+	}
+
+	err := applyChannelTestOptions(request, channelTestOptions{
+		prompt:          "benchmark prompt",
+		maxOutputTokens: 256,
+		enableThinking:  true,
+	})
+	if err != nil {
+		t.Fatalf("apply options: %v", err)
+	}
+	if request.Messages[0].Content != "benchmark prompt" {
+		t.Fatalf("prompt = %#v, want benchmark prompt", request.Messages[0].Content)
+	}
+	if request.MaxTokens == nil || *request.MaxTokens != 256 {
+		t.Fatalf("max tokens = %v, want 256", request.MaxTokens)
+	}
+	if request.ReasoningEffort != "high" {
+		t.Fatalf("reasoning effort = %q, want high", request.ReasoningEffort)
+	}
+	if string(request.EnableThinking) != "true" {
+		t.Fatalf("enable thinking = %s, want true", request.EnableThinking)
+	}
+}
+
+func TestSelectChannelBenchmarkChannelsDefaultsToEnabled(t *testing.T) {
+	channels := []*model.Channel{
+		{Id: 1, Status: 1},
+		{Id: 2, Status: 2},
+		{Id: 3, Status: 1},
+	}
+
+	selected, selectedIDs := selectChannelBenchmarkChannels(channels, nil)
+	if len(selected) != 2 || len(selectedIDs) != 2 || selectedIDs[0] != 1 || selectedIDs[1] != 3 {
+		t.Fatalf("selected ids = %v, want [1 3]", selectedIDs)
+	}
+}

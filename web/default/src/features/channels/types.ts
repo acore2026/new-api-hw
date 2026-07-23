@@ -179,6 +179,9 @@ export interface ChannelBenchmarkConfig {
   concurrency: number
   timeout_seconds: number
   max_tokens: number
+  prompt: string
+  enable_thinking: boolean
+  channel_ids: number[]
 }
 
 export interface ChannelBenchmarkResult {

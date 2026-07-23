@@ -22,15 +22,20 @@ const (
 	defaultChannelBenchmarkConcurrency    = 3
 	defaultChannelBenchmarkTimeoutSeconds = 120
 	defaultChannelBenchmarkMaxTokens      = 128
+	defaultChannelBenchmarkPrompt         = "Write a numbered list of concise, distinct facts. Continue until the response limit."
 	maxChannelBenchmarkConcurrency        = 10
 	maxChannelBenchmarkTimeoutSeconds     = 600
 	maxChannelBenchmarkMaxTokens          = 2048
+	maxChannelBenchmarkPromptLength       = 16000
 )
 
 type channelBenchmarkConfig struct {
-	Concurrency    int `json:"concurrency"`
-	TimeoutSeconds int `json:"timeout_seconds"`
-	MaxTokens      int `json:"max_tokens"`
+	Concurrency    int    `json:"concurrency"`
+	TimeoutSeconds int    `json:"timeout_seconds"`
+	MaxTokens      int    `json:"max_tokens"`
+	Prompt         string `json:"prompt"`
+	EnableThinking bool   `json:"enable_thinking"`
+	ChannelIDs     []int  `json:"channel_ids"`
 }
 
 type channelBenchmarkResult struct {
@@ -85,6 +90,8 @@ func StartChannelBenchmark(c *gin.Context) {
 		Concurrency:    defaultChannelBenchmarkConcurrency,
 		TimeoutSeconds: defaultChannelBenchmarkTimeoutSeconds,
 		MaxTokens:      defaultChannelBenchmarkMaxTokens,
+		Prompt:         defaultChannelBenchmarkPrompt,
+		EnableThinking: true,
 	}
 	if c.Request.Body != nil && c.Request.ContentLength != 0 {
 		if err := common.DecodeJson(c.Request.Body, &config); err != nil && !errors.Is(err, io.EOF) {
@@ -92,6 +99,7 @@ func StartChannelBenchmark(c *gin.Context) {
 			return
 		}
 	}
+	config.Prompt = strings.TrimSpace(config.Prompt)
 	if err := validateChannelBenchmarkConfig(config); err != nil {
 		common.ApiErrorMsg(c, err.Error())
 		return
@@ -114,6 +122,11 @@ func StartChannelBenchmark(c *gin.Context) {
 	channels, err := model.GetAllChannels(0, 0, true, false)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	channels, config.ChannelIDs = selectChannelBenchmarkChannels(channels, config.ChannelIDs)
+	if len(channels) == 0 {
+		common.ApiErrorMsg(c, "no channels selected for benchmark")
 		return
 	}
 
@@ -191,7 +204,48 @@ func validateChannelBenchmarkConfig(config channelBenchmarkConfig) error {
 	if config.MaxTokens < 16 || config.MaxTokens > maxChannelBenchmarkMaxTokens {
 		return fmt.Errorf("max_tokens must be between 16 and %d", maxChannelBenchmarkMaxTokens)
 	}
+	if config.Prompt == "" {
+		return errors.New("prompt must not be empty")
+	}
+	if len(config.Prompt) > maxChannelBenchmarkPromptLength {
+		return fmt.Errorf("prompt must not exceed %d bytes", maxChannelBenchmarkPromptLength)
+	}
+	if config.ChannelIDs != nil && len(config.ChannelIDs) == 0 {
+		return errors.New("at least one channel must be selected")
+	}
 	return nil
+}
+
+func selectChannelBenchmarkChannels(channels []*model.Channel, requestedIDs []int) ([]*model.Channel, []int) {
+	if requestedIDs == nil {
+		selected := make([]*model.Channel, 0, len(channels))
+		selectedIDs := make([]int, 0, len(channels))
+		for _, channel := range channels {
+			if channel != nil && channel.Status == common.ChannelStatusEnabled {
+				selected = append(selected, channel)
+				selectedIDs = append(selectedIDs, channel.Id)
+			}
+		}
+		return selected, selectedIDs
+	}
+
+	requested := make(map[int]struct{}, len(requestedIDs))
+	for _, channelID := range requestedIDs {
+		requested[channelID] = struct{}{}
+	}
+	selected := make([]*model.Channel, 0, len(requested))
+	selectedIDs := make([]int, 0, len(requested))
+	for _, channel := range channels {
+		if channel == nil {
+			continue
+		}
+		if _, ok := requested[channel.Id]; !ok {
+			continue
+		}
+		selected = append(selected, channel)
+		selectedIDs = append(selectedIDs, channel.Id)
+	}
+	return selected, selectedIDs
 }
 
 func buildChannelBenchmarkWork(channels []*model.Channel) ([]channelBenchmarkWork, []channelBenchmarkResult) {
@@ -293,8 +347,9 @@ func executeChannelBenchmarkCase(
 		isStream,
 		channelTestOptions{
 			context:         caseContext,
-			prompt:          "Write a numbered list of concise, distinct facts. Continue until the response limit.",
+			prompt:          config.Prompt,
 			maxOutputTokens: uint(config.MaxTokens),
+			enableThinking:  config.EnableThinking,
 			logLabel:        "模型基准测试",
 		},
 	)

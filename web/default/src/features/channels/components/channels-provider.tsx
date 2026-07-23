@@ -31,7 +31,6 @@ type DialogType =
   | 'create-channel'
   | 'update-channel'
   | 'test-channel'
-  | 'benchmark-channels'
   | 'balance-query'
   | 'fetch-models'
   | 'ollama-models'
