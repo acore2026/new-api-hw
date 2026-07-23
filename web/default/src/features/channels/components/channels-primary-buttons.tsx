@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { DashboardSpeed01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Plus,
   MoreHorizontal,
@@ -152,6 +154,13 @@ export function ChannelsPrimaryButtons() {
               {t('Test All Channels')}
               <DropdownMenuShortcut>
                 <TestTube className='h-4 w-4' />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={() => setOpen('benchmark-channels')}>
+              {t('Benchmark All Models')}
+              <DropdownMenuShortcut>
+                <HugeiconsIcon icon={DashboardSpeed01Icon} strokeWidth={2} />
               </DropdownMenuShortcut>
             </DropdownMenuItem>
 

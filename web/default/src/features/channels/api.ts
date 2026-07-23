@@ -25,6 +25,8 @@ import type {
   Channel,
   ChannelBalanceResponse,
   ChannelTestResponse,
+  ChannelBenchmarkConfig,
+  ChannelBenchmarkResponse,
   CopyChannelParams,
   CopyChannelResponse,
   FetchModelsResponse,
@@ -241,6 +243,27 @@ export async function testChannel(
     `/api/channel/test/${id}`,
     channelActionConfig({ params })
   )
+  return res.data
+}
+
+export async function startChannelBenchmark(
+  config: ChannelBenchmarkConfig
+): Promise<ChannelBenchmarkResponse> {
+  const res = await api.post(
+    '/api/channel/benchmark',
+    config,
+    channelActionConfig()
+  )
+  return res.data
+}
+
+export async function getChannelBenchmark(): Promise<ChannelBenchmarkResponse> {
+  const res = await api.get('/api/channel/benchmark', channelActionConfig())
+  return res.data
+}
+
+export async function cancelChannelBenchmark(): Promise<ChannelBenchmarkResponse> {
+  const res = await api.delete('/api/channel/benchmark', channelActionConfig())
   return res.data
 }
 

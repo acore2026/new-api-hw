@@ -162,6 +162,61 @@ export interface ChannelTestResponse {
   }
 }
 
+export type ChannelBenchmarkStatus =
+  | 'running'
+  | 'cancelling'
+  | 'completed'
+  | 'cancelled'
+
+export type ChannelBenchmarkResultStatus =
+  | 'pending'
+  | 'running'
+  | 'success'
+  | 'failed'
+  | 'cancelled'
+
+export interface ChannelBenchmarkConfig {
+  concurrency: number
+  timeout_seconds: number
+  max_tokens: number
+}
+
+export interface ChannelBenchmarkResult {
+  channel_id: number
+  channel_name: string
+  channel_type: number
+  channel_type_name: string
+  model: string
+  status: ChannelBenchmarkResultStatus
+  stream: boolean
+  total_latency_ms: number
+  ttft_ms?: number
+  output_tokens: number
+  tps?: number
+  error?: string
+  error_code?: string
+}
+
+export interface ChannelBenchmarkJob {
+  id: string
+  status: ChannelBenchmarkStatus
+  config: ChannelBenchmarkConfig
+  total: number
+  completed: number
+  succeeded: number
+  failed: number
+  cancelled: number
+  started_at: number
+  completed_at?: number
+  results: ChannelBenchmarkResult[]
+}
+
+export interface ChannelBenchmarkResponse {
+  success: boolean
+  message?: string
+  data?: ChannelBenchmarkJob | null
+}
+
 export interface ChannelBalanceResponse {
   success: boolean
   message?: string

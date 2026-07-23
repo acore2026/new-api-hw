@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,6 +42,22 @@ type testResult struct {
 	context     *gin.Context
 	localErr    error
 	newAPIError *types.NewAPIError
+	metrics     *channelTestMetrics
+}
+
+type channelTestMetrics struct {
+	totalLatencyMs int64
+	ttftMs         *int64
+	outputTokens   int
+	tps            *float64
+	stream         bool
+}
+
+type channelTestOptions struct {
+	context         context.Context
+	prompt          string
+	maxOutputTokens uint
+	logLabel        string
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointType string) string {
@@ -75,6 +92,17 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 }
 
 func testChannel(channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) testResult {
+	return testChannelWithOptions(channel, testUserID, testModel, endpointType, isStream, channelTestOptions{})
+}
+
+func testChannelWithOptions(
+	channel *model.Channel,
+	testUserID int,
+	testModel string,
+	endpointType string,
+	isStream bool,
+	options channelTestOptions,
+) testResult {
 	tik := time.Now()
 	var unsupportedTestChannelTypes = []int{
 		constant.ChannelTypeMidjourney,
@@ -153,12 +181,17 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		testModel = ratio_setting.WithCompactModelSuffix(testModel)
 	}
 
-	c.Request = &http.Request{
+	requestContext := options.context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	c.Request = (&http.Request{
 		Method: "POST",
 		URL:    &url.URL{Path: requestPath}, // 使用动态路径
 		Body:   nil,
 		Header: make(http.Header),
-	}
+	}).WithContext(requestContext)
+	common.SetContextKey(c, constant.ContextKeyRequestStartTime, tik)
 
 	cache, err := model.GetUserCache(testUserID)
 	if err != nil {
@@ -237,6 +270,13 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 	}
 
 	request := buildTestRequest(testModel, endpointType, channel, isStream)
+	if err := applyChannelTestOptions(request, options); err != nil {
+		return testResult{
+			context:     c,
+			localErr:    err,
+			newAPIError: types.NewError(err, types.ErrorCodeJsonMarshalFailed),
+		}
+	}
 
 	info, err := relaycommon.GenRelayInfo(c, relayFormat, request, nil)
 
@@ -500,15 +540,20 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 	tok := time.Now()
 	milliseconds := tok.Sub(tik).Milliseconds()
 	consumedTime := float64(milliseconds) / 1000.0
+	metrics := buildChannelTestMetrics(info, usage, tok, milliseconds)
 	other := buildTestLogOther(c, info, priceData, usage, tieredResult)
+	logLabel := strings.TrimSpace(options.logLabel)
+	if logLabel == "" {
+		logLabel = "模型测试"
+	}
 	model.RecordConsumeLog(c, testUserID, model.RecordConsumeLogParams{
 		ChannelId:        channel.Id,
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
 		ModelName:        info.OriginModelName,
-		TokenName:        "模型测试",
+		TokenName:        logLabel,
 		Quota:            quota,
-		Content:          "模型测试",
+		Content:          logLabel,
 		UseTimeSeconds:   int(consumedTime),
 		IsStream:         info.IsStream,
 		Group:            info.UsingGroup,
@@ -519,7 +564,71 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		context:     c,
 		localErr:    nil,
 		newAPIError: nil,
+		metrics:     metrics,
 	}
+}
+
+func applyChannelTestOptions(request dto.Request, options channelTestOptions) error {
+	if strings.TrimSpace(options.prompt) == "" && options.maxOutputTokens == 0 {
+		return nil
+	}
+
+	switch req := request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		if prompt := strings.TrimSpace(options.prompt); prompt != "" {
+			if len(req.Messages) == 0 {
+				req.Messages = []dto.Message{{Role: "user", Content: prompt}}
+			} else {
+				req.Messages[len(req.Messages)-1].Content = prompt
+			}
+		}
+		if options.maxOutputTokens > 0 {
+			if req.MaxCompletionTokens != nil {
+				req.MaxCompletionTokens = lo.ToPtr(options.maxOutputTokens)
+			} else {
+				req.MaxTokens = lo.ToPtr(options.maxOutputTokens)
+			}
+		}
+	case *dto.OpenAIResponsesRequest:
+		if prompt := strings.TrimSpace(options.prompt); prompt != "" {
+			input, err := common.Marshal([]map[string]any{{
+				"role":    "user",
+				"content": prompt,
+			}})
+			if err != nil {
+				return err
+			}
+			req.Input = input
+		}
+		if options.maxOutputTokens > 0 {
+			req.MaxOutputTokens = lo.ToPtr(options.maxOutputTokens)
+		}
+	}
+	return nil
+}
+
+func buildChannelTestMetrics(info *relaycommon.RelayInfo, usage *dto.Usage, finishedAt time.Time, totalLatencyMs int64) *channelTestMetrics {
+	metrics := &channelTestMetrics{
+		totalLatencyMs: totalLatencyMs,
+		outputTokens:   usage.CompletionTokens,
+		stream:         info.IsStream,
+	}
+	if !info.IsStream || !info.HasSendResponse() {
+		return metrics
+	}
+
+	ttftMs := info.FirstResponseTime.Sub(info.StartTime).Milliseconds()
+	if ttftMs < 0 {
+		return metrics
+	}
+	metrics.ttftMs = &ttftMs
+
+	generationSeconds := finishedAt.Sub(info.FirstResponseTime).Seconds()
+	if usage.CompletionTokens > 0 && generationSeconds > 0 {
+		tps := float64(usage.CompletionTokens) / generationSeconds
+		metrics.tps = &tps
+	}
+	return metrics
 }
 
 func attachTestBillingRequestInput(info *relaycommon.RelayInfo, request dto.Request) error {
@@ -779,6 +888,16 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		return &dto.EmbeddingRequest{
 			Model: model,
 			Input: []any{"hello world"},
+		}
+	}
+
+	if channel.Type == constant.ChannelTypeVolcEngine &&
+		strings.Contains(strings.ToLower(model), "seedream") {
+		return &dto.ImageRequest{
+			Model:  model,
+			Prompt: "a cute cat",
+			N:      lo.ToPtr(uint(1)),
+			Size:   "1024x1024",
 		}
 	}
 
