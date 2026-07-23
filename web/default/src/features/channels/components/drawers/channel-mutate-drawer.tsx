@@ -842,6 +842,13 @@ export function ChannelMutateDrawer({
         proxy: form.getValues('proxy') || '',
         tls_insecure_skip_verify:
           form.getValues('tls_insecure_skip_verify') === true,
+        w3_oauth_enabled:
+          type === 35 && form.getValues('w3_oauth_enabled') === true,
+        w3_provider_id:
+          form.getValues('w3_provider_id') || W3_DEFAULTS.providerId,
+        w3_verify_tls: form.getValues('w3_verify_tls') === true,
+        w3_api_base_url:
+          form.getValues('w3_api_base_url') || W3_DEFAULTS.apiBaseUrl,
       })
 
       if (response.success && response.data) {

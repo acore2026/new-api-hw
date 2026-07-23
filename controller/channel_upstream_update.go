@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -263,6 +264,41 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 	baseURL := constant.ChannelBaseURLs[channel.Type]
 	if channel.GetBaseURL() != "" {
 		baseURL = channel.GetBaseURL()
+	}
+
+	settings := channel.GetOtherSettings()
+	if channel.Type == constant.ChannelTypeMiniMax && settings.W3OAuthEnabled {
+		key, _, apiErr := channel.GetNextEnabledKey()
+		if apiErr != nil {
+			return nil, fmt.Errorf("获取渠道密钥失败: %w", apiErr)
+		}
+		oauthKey, err := service.ParseW3OAuthKey(strings.TrimSpace(key))
+		if err != nil {
+			return nil, err
+		}
+		if channel.Id > 0 &&
+			!channel.ChannelInfo.IsMultiKey &&
+			service.W3OAuthKeyExpiresWithin(oauthKey, time.Now(), service.W3CredentialRefreshThreshold) {
+			refreshedKey, _, refreshErr := service.RefreshW3ChannelCredential(
+				context.Background(),
+				channel.Id,
+				service.W3CredentialRefreshOptions{ResetCaches: true},
+			)
+			if refreshErr != nil {
+				return nil, fmt.Errorf("刷新 W3 凭据失败: %w", refreshErr)
+			}
+			oauthKey = refreshedKey
+		}
+		models, err := service.FetchW3Models(
+			context.Background(),
+			settings,
+			channel.GetSetting(),
+			oauthKey.AccessToken,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return normalizeModelNames(models), nil
 	}
 
 	if channel.Type == constant.ChannelTypeOllama {

@@ -1015,6 +1015,10 @@ func FetchModels(c *gin.Context) {
 		Key                   string `json:"key"`
 		Proxy                 string `json:"proxy"`
 		TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify"`
+		W3OAuthEnabled        bool   `json:"w3_oauth_enabled"`
+		W3ProviderID          string `json:"w3_provider_id"`
+		W3VerifyTLS           bool   `json:"w3_verify_tls"`
+		W3ApiBaseURL          string `json:"w3_api_base_url"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1036,6 +1040,40 @@ func FetchModels(c *gin.Context) {
 	channelSetting := dto.ChannelSettings{
 		Proxy:                 req.Proxy,
 		TLSInsecureSkipVerify: req.TLSInsecureSkipVerify,
+	}
+
+	if req.Type == constant.ChannelTypeMiniMax && req.W3OAuthEnabled {
+		oauthKey, err := service.ParseW3OAuthKey(key)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		models, err := service.FetchW3Models(
+			c.Request.Context(),
+			dto.ChannelOtherSettings{
+				W3OAuthEnabled: true,
+				W3ProviderID:   req.W3ProviderID,
+				W3VerifyTLS:    req.W3VerifyTLS,
+				W3ApiBaseURL:   req.W3ApiBaseURL,
+			},
+			channelSetting,
+			oauthKey.AccessToken,
+		)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": fmt.Sprintf("获取 W3 模型失败: %s", err.Error()),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    models,
+		})
+		return
 	}
 
 	if req.Type == constant.ChannelTypeOllama {

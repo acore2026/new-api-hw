@@ -588,6 +588,10 @@ export async function fetchModels(data: {
   key: string
   proxy?: string
   tls_insecure_skip_verify?: boolean
+  w3_oauth_enabled?: boolean
+  w3_provider_id?: string
+  w3_verify_tls?: boolean
+  w3_api_base_url?: string
 }): Promise<FetchModelsResponse> {
   const res = await api.post(
     '/api/channel/fetch_models',
